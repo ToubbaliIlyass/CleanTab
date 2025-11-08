@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "CleanTab",
+  "version": "1.0.0",
+  "description": "A CleanTab for a ClearMind — blocks NSFW and distracting content.",
+  "icons": {
+    "16": "Assets/icon16.png",
+    "48": "Assets/icon48.png",
+    "128": "Assets/large-logo-CleanTab.png"
+  },
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": "assets/icon48.png"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "declarativeNetRequest",
+    "activeTab",
+    "webNavigation",
+    "notifications"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "options_page": "options/index.html",
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "base-rules",
+        "enabled": true,
+        "path": "rules/base.json"
+      }
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "redirect/index.html",
+        "assets/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
