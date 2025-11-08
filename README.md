@@ -1,4 +1,10 @@
-# 🧠 CleanTab — A CleanTab for a ClearMind
+<p align="center">
+  <img src="https://github.com/ToubbaliIlyass/CleanTab/blob/main/Assets/large-logo-CleanTab.png" alt="CleanTab Logo" width="100"/>
+</p>
+
+<h1 align="center">CleanTab</h1>
+<p align="center"><i>A CleanTab for a ClearMind.</i></p>
+
 
 **CleanTab** is a free, privacy-first Chrome extension that helps you stay away from NSFW and distracting content.  
 Unlike most blockers, CleanTab scans *inside* your active tabs (like Reddit, Twitter, or image-heavy sites) to detect unsafe or explicit visuals — and gently redirects you before you spiral.
