@@ -1,0 +1,58 @@
+body {
+  background: #0b1120;
+  height: 100vh;
+  margin: 0;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+}
+
+.card {
+  text-align: center;
+  padding: 40px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  max-width: 480px;
+  width: 90%;
+}
+
+h1 {
+  font-size: 2.2rem;
+  margin-bottom: 12px;
+}
+
+.subtitle {
+  font-size: 1.1rem;
+  color: #e5e5e5;
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 30px;
+}
+
+.actions a {
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.actions a:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.bottom-note {
+  font-size: 0.9rem;
+  color: #aaaaaa;
+}
