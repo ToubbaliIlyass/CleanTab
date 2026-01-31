@@ -19,7 +19,9 @@
   ],
 
   "action": {
-    "default_icon": "Assets/icon48.png"
+    "default_icon": "Assets/icon48.png",
+    "default_popup": "popup/popup.html"
+
   },
 
   "icons": {

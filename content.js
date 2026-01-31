@@ -4,6 +4,8 @@
 ///////////////////////////////
 
 // ----- Keyword Lists ----- //
+
+let redirectTriggered = false;
 const strongKeywords = [
   "porn",
   "xxx",
@@ -120,7 +122,32 @@ function isFeedPage(url) {
 ///////////////////////////////
 // Scan Function (Main Logic)
 ///////////////////////////////
+// function scan() {
+//   const url = window.location.href;
+//   const inside = isInsidePost(url);
+
+//   const urlScore = getURLScore(url);
+//   const textScore = getTextScore();
+
+//   // 1. URL-based redirect (Strong intent)
+//   if (urlScore >= 5) {
+//     chrome.runtime.sendMessage({ action: "redirect" });
+//     return;
+//   }
+
+//   // 2. Text-based detection only inside posts
+//   if (inside && textScore >= 3) {
+//     chrome.runtime.sendMessage({ action: "redirect" });
+//     return;
+//   }
+
+//   // 3. Ignore scanning on feeds
+//   if (isFeedPage(url)) return;
+// }
+
 function scan() {
+  if (redirectTriggered) return;
+
   const url = window.location.href;
   const inside = isInsidePost(url);
 
@@ -129,12 +156,14 @@ function scan() {
 
   // 1. URL-based redirect (Strong intent)
   if (urlScore >= 5) {
+    redirectTriggered = true;
     chrome.runtime.sendMessage({ action: "redirect" });
     return;
   }
 
   // 2. Text-based detection only inside posts
   if (inside && textScore >= 3) {
+    redirectTriggered = true;
     chrome.runtime.sendMessage({ action: "redirect" });
     return;
   }
@@ -166,6 +195,7 @@ function scan() {
 
 // Trigger scan on SPA navigation
 window.addEventListener("urlchange", () => {
+  redirectTriggered = false;
   setTimeout(scan, 300);
 });
 
@@ -193,6 +223,7 @@ let lastURL = location.href;
 setInterval(() => {
   if (location.href !== lastURL) {
     lastURL = location.href;
+    redirectTriggered = false;
     setTimeout(scan, 300);
   }
 }, 250);

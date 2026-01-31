@@ -1,0 +1,125 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+body {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.popup {
+  width: 320px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.accent {
+  color: #ff6900;
+}
+
+.status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.status.on {
+  background: #e7f8ef;
+  color: #1f7a4f;
+}
+
+/* Subtitle */
+.subtitle {
+  margin: 8px 0 16px;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Stats */
+.stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 12px;
+  background: #f6f6f6;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.stat {
+  text-align: center;
+}
+
+.value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.label {
+  font-size: 11px;
+  color: #777;
+}
+
+.divider {
+  width: 1px;
+  height: 30px;
+  background: #ddd;
+}
+
+/* Menu */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #ffffff;
+  border: 1px solid #eaeaea;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background: #f7f7f7;
+}
+
+.menu-item.warning {
+  color: #c2410c;
+}
+
+.menu-item.disabled {
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 12px;
+  color: #888;
+}
+
+/* Footer */
+.footer {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 11px;
+  color: #999;
+}
