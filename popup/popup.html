@@ -1,57 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="popup.css" />
-    <script src="popup.js"></script>
-
-    
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-    <div class="popup">
-        
-      <!-- Header -->
-      <header class="header">
-        <div class="logo">
-          <span class="accent">C</span>lean<span class="accent">T</span>ab
+  <div class="popup">
+
+    <!-- ===================== -->
+    <!-- VIEW 1: NORMAL -->
+    <!-- ===================== -->
+    <div class="view view-normal is-active">
+      <div class="view-content">
+        <header class="header">
+          <div class="logo">
+            <div class="logo-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="#FF6B35" opacity="0.1"/>
+                <path d="M12 6V12L16 14" stroke="#FF6B35" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="logo-text">
+              <span class="accent">Clean</span>Tab
+            </div>
+          </div>
+          <div class="status on" id="statusBadge" data-state="on">
+            <span class="status-dot"></span>
+            <span class="status-text">Active</span>
+          </div>
+        </header>
+
+        <div class="tagline">Stay intentional online</div>
+        <div class="tagline disabled-notice" id="disabledNotice" style="display:none;">
+          CleanTab is currently disabled
         </div>
-        <div class="status on">ON</div>
-      </header>
 
-      <p class="subtitle">Stay intentional online</p>
-           <!-- Stats -->
-      <section class="stats">
-        <div class="stat">
-          <span id="redirects" class="value">1</span>
-          <span class="label">Redirects Today</span>
-        </div>
-      </section>
+        <section class="stats-container">
+          <div class="streak-card">
+            <div class="streak-value" id="streakValue">1</div>
+            <div class="streak-label">Day Streak</div>
+            <div class="streak-sub" id="streakSub">Building consistency</div>
+            <div class="streak-icon">🔥</div>
+          </div>
 
-      <!-- Menu -->
-      <section class="menu">
-        <button class="menu-item">
-          Cooldown <span class="hint">Active</span>
-        </button>
+          <div class="stat-card">
+            <div class="stat-value" id="redirects">0</div>
+            <div class="stat-label">Blocks Today</div>
+            <div class="stat-icon">🛡️</div>
+          </div>
+        </section>
 
-        <button class="menu-item warning">
-          Disable <span class="hint">12h delay</span>
-        </button>
+        <section class="controls">
+          <button class="control-btn danger" id="disableBtn">
+            <span class="btn-content">
+              <span class="btn-label">Disable Protection</span>
+              <span class="btn-hint">12-hour cooldown required</span>
+            </span>
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M7 10L9 12L13 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
 
-        <button class="menu-item disabled">
-          Analytics <span class="hint">Soon</span>
-        </button>
+          <button class="control-btn success" id="enableBtn" style="display:none;">
+            <span class="btn-content">
+              <span class="btn-label">Enable Protection</span>
+              <span class="btn-hint">Turn protection back on</span>
+            </span>
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M7 10L9 12L13 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </section>
+      </div>
 
-        <button class="menu-item">
-          Settings
-        </button>
-      </section>
-
-      <!-- Footer -->
       <footer class="footer">
-        Focus over impulse.
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.4">
+          <path d="M8 2L3 7L3.7 7.7L7.5 3.9V14H8.5V3.9L12.3 7.7L13 7L8 2Z"/>
+        </svg>
+        <span>Focus over impulse</span>
       </footer>
-
-
     </div>
+
+    <!-- ===================== -->
+    <!-- VIEW 2: CONFIRM -->
+    <!-- ===================== -->
+    <div class="view view-confirm">
+      <div class="view-content">
+        <div class="view-header">
+          <div class="icon-circle warning">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 class="view-title">Disable CleanTab?</h2>
+          <p class="view-description">
+            Protection will be disabled after a <strong>12-hour cooldown</strong>. This delay helps prevent impulsive decisions.
+          </p>
+        </div>
+
+        <div class="info-box">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M9 6V10M9 13H9.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>You'll need to type a confirmation phrase to proceed</span>
+        </div>
+      </div>
+
+      <div class="action-group">
+        <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
+        <button class="btn btn-primary" id="confirmContinue">Continue</button>
+      </div>
+    </div>
+
+    <!-- ===================== -->
+    <!-- VIEW 3: PASSPHRASE -->
+    <!-- ===================== -->
+    <div class="view view-passphrase">
+      <div class="view-content">
+        <div class="view-header">
+          <div class="icon-circle neutral">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M15 9H15.01M9 9H9.01M9.5 13C9.5 13 10.5 15 12 15C13.5 15 14.5 13 14.5 13M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 class="view-title">Confirm Your Intent</h2>
+          <p class="view-description">
+            Type the phrase below exactly as shown to continue.
+          </p>
+        </div>
+
+        <div class="phrase-container">
+          <div class="phrase-label">Confirmation phrase:</div>
+          <div class="phrase-box">
+            I choose long-term focus over short-term impulse.
+          </div>
+        </div>
+
+        <input
+          type="text"
+          class="text-input"
+          placeholder="Type the phrase here..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="action-group">
+        <button class="btn btn-primary disabled" disabled>Start Cooldown</button>
+      </div>
+    </div>
+
+    <!-- ===================== -->
+    <!-- VIEW 4: COOLDOWN ACTIVE -->
+    <!-- ===================== -->
+    <div class="view view-cooldown">
+      <div class="view-content">
+        <div class="view-header">
+          <div class="icon-circle info">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 7V13M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 class="view-title">Cooldown Active</h2>
+          <p class="view-description">
+            CleanTab will remain enabled while you reflect on this decision.
+          </p>
+        </div>
+
+        <div class="timer-card">
+          <div class="timer-label">Time remaining</div>
+          <div class="timer-display" id="cooldown-timer">--:--:--</div>
+          <div class="timer-sublabel">This delay prevents impulsive actions</div>
+        </div>
+      </div>
+
+      <div class="action-group">
+        <button class="btn btn-secondary" id="cancelCooldown">Cancel Cooldown</button>
+      </div>
+    </div>
+
+    <!-- ===================== -->
+    <!-- VIEW 5: RE-ENTER PASSPHRASE -->
+    <!-- ===================== -->
+    <div class="view view-reenter">
+      <div class="view-content">
+        <div class="view-header">
+          <div class="icon-circle warning">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L3 7V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2 class="view-title">Final Confirmation</h2>
+          <p class="view-description">
+            The cooldown period has ended. To disable CleanTab, re-enter the confirmation phrase.
+          </p>
+        </div>
+
+        <div class="phrase-container">
+          <div class="phrase-label">Type this phrase:</div>
+          <div class="phrase-box">
+            I choose long-term focus over short-term impulse.
+          </div>
+        </div>
+
+        <input
+          type="text"
+          class="text-input"
+          placeholder="Type the phrase here..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="action-group">
+        <button class="btn btn-danger disabled">Disable CleanTab</button>
+      </div>
+    </div>
+
+  </div>
+<script src="popup.js"></script>
 </body>
 </html>

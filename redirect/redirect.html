@@ -2,40 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stay Focused — CleanTab</title>
   <link rel="stylesheet" href="redirect.css" />
+  <script src="redirect.js"></script>
 </head>
 
 <body>
-  <div class="card">
-    <h1>Stay Focused 🌿</h1>
+  <div class="container">
+    <div class="card">
+      <!-- Header Section -->
+      <div class="header">
+        <div class="icon-circle">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L3 7V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V7L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="title">You're Protected</h1>
+        <p class="subtitle">
+          This page was blocked to help you stay focused.<br/>
+          Choose your next step mindfully.
+        </p>
+      </div>
 
-    <p class="subtitle">
-      This moment is an opportunity.<br />
-      Choose clarity over impulse — your future self will thank you.
-    </p>
+      <!-- Reason Box -->
+      <div class="info-section">
+        <div class="reason-box">
+          <div class="reason-label">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 4V8M8 11H8.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>Why this was blocked</span>
+          </div>
+          <p id="reason-text" class="reason-text">Content filtered for your wellbeing</p>
+        </div>
+        <div class="appeal-button-container">
+          <button id="appeal-btn" class="appeal-button">
+            Was this blocked by mistake?
+          </button>
+        </div>
+      </div>
 
-    <div class="actions">
-      <a href="https://www.youtube.com/results?search_query=lofi+study+music" target="_blank">
-        Listen to Focus Music
-      </a>
+      <!-- Productive Actions -->
+      <div class="actions-section">
+        <!-- Streak Card -->
+        <div class="streak-display">
+          <div class="streak-icon">🔥</div>
+          <div class="streak-content">
+            <div class="streak-value" id="streakValue">Day 1</div>
+            <div class="streak-subtitle">Protect your progress.</div>
+          </div>
+        </div>
 
-      <a href="https://notion.so" target="_blank">
-        Open Your Notes
-      </a>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button class="reset-button" id="resetButton">
+            <div class="reset-content">
+              <div class="reset-title">Take 60-Second Reset</div>
+              <div class="reset-description">Pause and breathe</div>
+            </div>
+            <div class="reset-icon">⏸️</div>
+          </button>
 
-      <a href="https://calendar.google.com" target="_blank">
-        Review Your Schedule
-      </a>
+          <button class="micro-action-button" id="microActionButton">
+            <div class="micro-content">
+              <div class="micro-title">Do 1 Small Action Instead</div>
+              <div class="micro-description" id="microDescription">Build momentum with micro-habits</div>
+            </div>
+            <div class="micro-icon">⚡</div>
+          </button>
+        </div>
+      </div>
 
-      <a href="https://acture.co" target="_blank">
-        Go to Acture (Your Goals)
-      </a>
+      <!-- Footer Message -->
+      <div class="footer-message">
+        <div class="footer-icon">✨</div>
+        <p>Every intentional choice strengthens your focus</p>
+      </div>
     </div>
 
-    <p class="bottom-note">
-      You're doing the right thing by choosing to stay focused. 🌱
-    </p>
+    <!-- Donation Banner - ENHANCED -->
+    <div class="donation-banner">
+      <div class="donation-content">
+        <div class="donation-icon">☕</div>
+        <div class="donation-message">
+          <p class="donation-text">
+            <span class="donation-highlight">CleanTab is free and privacy-first.</span><br/>
+            If it helps you focus, consider <a href="https://ko-fi.com/ilyasstoubbali" target="_blank" class="donation-link">buying me a coffee</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Branding -->
+    <div class="branding">
+      <span class="brand-text">Protected by <span class="accent">Clean</span>Tab</span>
+    </div>
+  </div>
+
+  <!-- Countdown Overlay -->
+  <div class="countdown-overlay" id="countdownOverlay">
+    <div class="countdown-content">
+      <div class="countdown-header">
+        <h2>Take a mindful moment</h2>
+        <p>Focus on your breathing</p>
+      </div>
+      <div class="countdown-circle">
+        <div class="countdown-number" id="countdownNumber">60</div>
+      </div>
+      <div class="countdown-message">
+        <p>Let yourself reset and refocus</p>
+      </div>
+      <button class="countdown-skip" id="countdownSkip">Skip</button>
+    </div>
   </div>
 </body>
 </html>

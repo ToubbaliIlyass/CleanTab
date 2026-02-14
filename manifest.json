@@ -2,8 +2,9 @@
   "manifest_version": 3,
   "name": "CleanTab",
   "version": "0.1",
+  "incognito": "split",
   "description": "Stay intentional online — CleanTab detects NSFW content and redirects you to focus.",
-  "permissions": ["tabs", "storage", "scripting", "activeTab"],
+  "permissions": ["tabs", "storage", "scripting", "activeTab", "alarms", "tabCapture"],
   "host_permissions": ["<all_urls>"],
 
   "background": {
