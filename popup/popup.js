@@ -293,8 +293,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Re-enter passphrase → FINAL disable (for now just clear cooldown)
   wirePassphraseView(".view-reenter", () => {
     chrome.storage.local.remove("cooldownUntil", () => {
-      chrome.storage.local.set({ enabled: false }, () => {
-        console.log("CleanTab disabled");
+      chrome.storage.local.set({ enabled: false, streak: 1 }, () => {
+        console.log("CleanTab disabled - streak reset to 1");
         showView("view-normal");
         syncEnabledUI(false);
       });

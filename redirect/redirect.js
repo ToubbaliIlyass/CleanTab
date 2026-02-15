@@ -177,8 +177,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Load and display streak
   function loadStreak() {
-    chrome.storage.local.get(["currentStreak"], (data) => {
-      const streak = data.currentStreak || 1;
+    chrome.storage.local.get(["streak"], (data) => {
+      const streak = data.streak || 1;
       const streakElement = document.getElementById("streakValue");
       if (streakElement) {
         streakElement.textContent = `Day ${streak}`;
