@@ -462,10 +462,44 @@ chrome.runtime.onInstalled.addListener(() => {
     // Handle rollover on installation
     streakManager.handleDailyRollover();
   });
+
+  // Check for expired disable timer on installation
+  checkDisableTimer();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   streakManager.handleDailyRollover();
+  checkDisableTimer(); // Check for expired disable timer on startup
+});
+
+// Check and handle expired disable timer
+function checkDisableTimer() {
+  chrome.storage.local.get(["enabled", "disableUntil"], (data) => {
+    if (data.enabled === false && data.disableUntil) {
+      const now = Date.now();
+      if (data.disableUntil <= now) {
+        // Timer expired, re-enable extension
+        chrome.storage.local.remove("disableUntil", () => {
+          chrome.storage.local.set({ enabled: true }, () => {
+            console.log("CleanTab auto-enabled after disable timer expired");
+          });
+        });
+      } else {
+        // Timer still active, schedule next check
+        const remainingMs = data.disableUntil - now;
+        const checkInterval = Math.min(remainingMs + 1000, 60000); // Check at expiry or every minute, whichever is sooner
+        setTimeout(checkDisableTimer, checkInterval);
+      }
+    }
+  });
+}
+
+// Create alarm to periodically check disable timer
+chrome.alarms.create("checkDisableTimer", { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "checkDisableTimer") {
+    checkDisableTimer();
+  }
 });
 
 // Developer command to clear appeal data

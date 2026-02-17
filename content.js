@@ -64,9 +64,10 @@ const keywordWeights = {
   xvideos: 5,
   redtube: 5,
   youporn: 5,
+  nude: 3,
 
   // Medium confidence (3 points)
-  nude: 3,
+
   sex: 3,
   explicit: 3,
   "18+": 3,

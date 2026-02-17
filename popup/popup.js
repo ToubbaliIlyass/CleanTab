@@ -239,9 +239,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (enableBtn) {
     enableBtn.addEventListener("click", () => {
-      chrome.storage.local.set({ enabled: true }, () => {
-        console.log("CleanTab enabled");
-        syncEnabledUI(true);
+      chrome.storage.local.remove("disableUntil", () => {
+        chrome.storage.local.set({ enabled: true }, () => {
+          console.log("CleanTab enabled");
+          if (disableTimerInterval) clearInterval(disableTimerInterval);
+          syncEnabledUI(true);
+
+          // Show streak, hide timer
+          const streakCard = document.getElementById("streakCard");
+          const timerCard = document.getElementById("disableTimerCard");
+          if (streakCard) streakCard.style.display = "block";
+          if (timerCard) timerCard.style.display = "none";
+        });
       });
     });
   }
@@ -290,18 +299,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Re-enter passphrase → FINAL disable (for now just clear cooldown)
+  // Re-enter passphrase → Show duration selection
   wirePassphraseView(".view-reenter", () => {
     chrome.storage.local.remove("cooldownUntil", () => {
-      chrome.storage.local.set({ enabled: false, streak: 1 }, () => {
-        console.log("CleanTab disabled - streak reset to 1");
-        showView("view-normal");
-        syncEnabledUI(false);
-      });
+      console.log("Passphrase confirmed - showing duration selection");
+      showView("view-duration");
     });
   });
 
   let cooldownInterval = null;
+  let disableTimerInterval = null;
 
   function startCooldownTimer(cooldownUntil) {
     const timerEl = document.getElementById("cooldown-timer");
@@ -337,6 +344,106 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
+  const cancelReenterBtn = document.getElementById("cancelReenter");
+
+  if (cancelReenterBtn) {
+    cancelReenterBtn.addEventListener("click", () => {
+      chrome.storage.local.remove("cooldownUntil", () => {
+        console.log("Re-enter passphrase cancelled");
+        showView("view-normal");
+      });
+    });
+  }
+
+  const cancelPassphraseBtn = document.getElementById("cancelPassphrase");
+
+  if (cancelPassphraseBtn) {
+    cancelPassphraseBtn.addEventListener("click", () => {
+      console.log("Passphrase entry cancelled");
+      showView("view-normal");
+    });
+  }
+
+  // Duration selection handlers
+  const durationButtons = document.querySelectorAll(".duration-btn");
+  const cancelDurationBtn = document.getElementById("cancelDuration");
+
+  durationButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const minutes = parseInt(btn.dataset.minutes);
+      const disableUntil = Date.now() + minutes * 60 * 1000;
+
+      chrome.storage.local.set(
+        { enabled: false, streak: 1, disableUntil },
+        () => {
+          console.log(
+            `CleanTab disabled for ${minutes} minutes - streak reset to 1`,
+          );
+          showView("view-normal");
+          syncEnabledUI(false);
+          startDisableTimer(disableUntil);
+        },
+      );
+    });
+  });
+
+  if (cancelDurationBtn) {
+    cancelDurationBtn.addEventListener("click", () => {
+      console.log("Duration selection cancelled");
+      showView("view-normal");
+    });
+  }
+
+  // Disable timer management
+  function startDisableTimer(disableUntil) {
+    const timerEl = document.getElementById("disableTimer");
+    const streakCard = document.getElementById("streakCard");
+    const timerCard = document.getElementById("disableTimerCard");
+
+    if (!timerEl || !streakCard || !timerCard) return;
+
+    // Show timer, hide streak
+    streakCard.style.display = "none";
+    timerCard.style.display = "block";
+
+    if (disableTimerInterval) clearInterval(disableTimerInterval);
+
+    function tick() {
+      const remaining = disableUntil - Date.now();
+
+      if (remaining <= 0) {
+        clearInterval(disableTimerInterval);
+        // Auto re-enable
+        chrome.storage.local.remove("disableUntil", () => {
+          chrome.storage.local.set({ enabled: true }, () => {
+            console.log("CleanTab auto-enabled after timer expired");
+            syncEnabledUI(true);
+            streakCard.style.display = "block";
+            timerCard.style.display = "none";
+          });
+        });
+        return;
+      }
+
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    }
+
+    tick();
+    disableTimerInterval = setInterval(tick, 1000);
+  }
+
+  // Check for active disable timer on popup open
+  chrome.storage.local.get(
+    ["enabled", "disableUntil"],
+    ({ enabled, disableUntil }) => {
+      if (enabled === false && disableUntil && disableUntil > Date.now()) {
+        startDisableTimer(disableUntil);
+      }
+    },
+  );
 
   // Debug functionality - add to extension footer
   const footer = document.querySelector("footer");

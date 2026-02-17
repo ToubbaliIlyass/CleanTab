@@ -37,11 +37,17 @@
         </div>
 
         <section class="stats-container">
-          <div class="streak-card">
+          <div class="streak-card" id="streakCard">
             <div class="streak-value" id="streakValue">1</div>
             <div class="streak-label">Day Streak</div>
             <div class="streak-sub" id="streakSub">Building consistency</div>
             <div class="streak-icon">🔥</div>
+          </div>
+
+          <div class="disable-timer-card" id="disableTimerCard" style="display:none;">
+            <div class="disable-timer-label">Protection resumes in</div>
+            <div class="disable-timer-display" id="disableTimer">--:--</div>
+            <div class="disable-timer-sublabel">CleanTab will auto-enable</div>
           </div>
 
           <div class="stat-card">
@@ -55,7 +61,7 @@
           <button class="control-btn danger" id="disableBtn">
             <span class="btn-content">
               <span class="btn-label">Disable Protection</span>
-              <span class="btn-hint">12-hour cooldown required</span>
+              <span class="btn-hint">6-hour cooldown required</span>
             </span>
             <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M7 10L9 12L13 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -95,7 +101,7 @@
           </div>
           <h2 class="view-title">Disable CleanTab?</h2>
           <p class="view-description">
-            Protection will be disabled after a <strong>12-hour cooldown</strong>. This delay helps prevent impulsive decisions.
+            Protection will be disabled after a <strong>6-hour cooldown</strong>. This delay helps prevent impulsive decisions.
           </p>
         </div>
 
@@ -149,6 +155,7 @@
 
       <div class="action-group">
         <button class="btn btn-primary disabled" disabled>Start Cooldown</button>
+        <button class="btn btn-secondary" id="cancelPassphrase">Cancel</button>
       </div>
     </div>
 
@@ -218,6 +225,46 @@
 
       <div class="action-group">
         <button class="btn btn-danger disabled">Disable CleanTab</button>
+        <button class="btn btn-secondary" id="cancelReenter">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ===================== -->
+    <!-- VIEW 6: SELECT DISABLE DURATION -->
+    <!-- ===================== -->
+    <div class="view view-duration">
+      <div class="view-content">
+        <div class="view-header">
+          <div class="icon-circle neutral">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 7V12L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2 class="view-title">How Long to Disable?</h2>
+          <p class="view-description">
+            Choose how long you need CleanTab disabled. It will automatically re-enable after this time.
+          </p>
+        </div>
+
+        <div class="duration-options">
+          <button class="duration-btn" data-minutes="5">
+            <div class="duration-time">5 minutes</div>
+            <div class="duration-hint">Quick break</div>
+          </button>
+          <button class="duration-btn" data-minutes="15">
+            <div class="duration-time">15 minutes</div>
+            <div class="duration-hint">Short session</div>
+          </button>
+          <button class="duration-btn" data-minutes="30">
+            <div class="duration-time">30 minutes</div>
+            <div class="duration-hint">Extended time</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="action-group">
+        <button class="btn btn-secondary" id="cancelDuration">Cancel</button>
       </div>
     </div>
 
