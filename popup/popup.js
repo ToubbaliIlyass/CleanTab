@@ -286,13 +286,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (isFuture) {
         cell.style.background = "transparent";
-        cell.style.border = "1px solid #1A1A1A";
+        cell.style.border = "1px solid #EEEBE5";
       } else if (pct >= 1)    cell.style.background = "#FF6B35";
-      else if (pct >= 0.75)   cell.style.background = "#CC4B1F";
-      else if (pct >= 0.5)    cell.style.background = "#8B3015";
-      else if (pct >= 0.25)   cell.style.background = "#4A1A0A";
-      else if (pct > 0)       cell.style.background = "#2A1208";
-      else                    cell.style.background = "#1C1C1C";
+      else if (pct >= 0.75)   cell.style.background = "#FFAA7A";
+      else if (pct >= 0.5)    cell.style.background = "#FFD0B5";
+      else if (pct >= 0.25)   cell.style.background = "#FFE9DB";
+      else if (pct > 0)       cell.style.background = "#FFF3ED";
+      else                    cell.style.background = "#F0EDE7";
 
       grid.appendChild(cell);
     }

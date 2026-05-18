@@ -32,16 +32,21 @@
         <div class="ring-stage" id="ringCard">
           <svg class="ring-svg" viewBox="0 0 180 180">
             <defs>
-              <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#FF6B35"/>
-                <stop offset="100%" stop-color="#FFAA7A"/>
+                <stop offset="100%" stop-color="#FFB347"/>
               </linearGradient>
+              <filter id="ring-glow" x="-25%" y="-25%" width="150%" height="150%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
             </defs>
             <circle class="ring-track" cx="90" cy="90" r="76"/>
             <circle class="ring-fill" id="ringFill" cx="90" cy="90" r="76"
               transform="rotate(-90 90 90)"
               stroke-dasharray="0 477.52"
-              stroke-linecap="round"/>
+              stroke-linecap="round"
+              filter="url(#ring-glow)"/>
           </svg>
           <div class="ring-center">
             <span class="ring-pct" id="ringPct">0%</span>
@@ -114,30 +119,43 @@
       <!-- ── TAB: GUARD ── -->
       <div class="panel hidden" id="panel-guard">
 
-        <div class="guard-section">
+        <div class="guard-block">
           <p class="section-label">Protection</p>
+          <p class="guard-desc">Disabling requires a passphrase and a short cooldown to prevent impulse decisions.</p>
           <button class="guard-btn danger" id="disableBtn">
             Disable CleanTab
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M18 6L6 18M6 6l12 12"/>
             </svg>
           </button>
           <button class="guard-btn success" id="enableBtn" style="display:none">
             Enable CleanTab
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M20 6L9 17l-5-5"/>
             </svg>
           </button>
         </div>
 
-        <div class="guard-section" style="margin-top:auto">
+        <div class="panel-rule"></div>
+
+        <div class="guard-block">
           <p class="section-label">Your data</p>
+          <p class="guard-desc">All data lives on your device. Export a JSON backup anytime.</p>
           <div class="data-btns">
-            <button class="data-btn" id="exportBtn">Export backup</button>
-            <button class="data-btn" id="importBtn">Import backup</button>
+            <button class="data-btn" id="exportBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              Export
+            </button>
+            <button class="data-btn" id="importBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              Import
+            </button>
             <input type="file" id="importFile" accept=".json" hidden/>
           </div>
-          <p class="data-note">All data stays on your device.</p>
         </div>
 
       </div>
