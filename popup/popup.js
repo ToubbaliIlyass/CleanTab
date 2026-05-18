@@ -1,552 +1,368 @@
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("popup.js loaded");
 
-  chrome.runtime.sendMessage({ action: "syncDaily" });
-
-  // ---------- Helpers ----------
-  function showView(viewClass) {
-    document.querySelectorAll(".view").forEach((v) => {
-      v.classList.remove("is-active");
+  // ── Tab navigation ─────────────────────────────────────────────────────────
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".panel").forEach((p) => p.classList.add("hidden"));
+      tab.classList.add("active");
+      document.getElementById(`panel-${tab.dataset.tab}`)?.classList.remove("hidden");
     });
+  });
 
-    const target = document.querySelector(`.${viewClass}`);
-    if (target) {
-      target.classList.add("is-active");
-    } else {
-      console.warn("View not found:", viewClass);
-    }
+  // ── View switcher (disable flow overlays) ─────────────────────────────────
+  function showView(viewClass) {
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("is-active"));
+    document.querySelector(`.${viewClass}`)?.classList.add("is-active");
   }
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
   function formatTime(ms) {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${h}h ${m}m ${s}s`;
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h}h ${m}m ${sec}s`;
   }
 
-  function attachPassphraseGuards(viewSelector) {
-    const input = document.querySelector(`${viewSelector} .text-input`);
-    if (!input) return;
-
-    input.addEventListener("paste", (e) => e.preventDefault());
-    input.addEventListener("drop", (e) => e.preventDefault());
+  function localDateKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   }
 
   function syncEnabledUI(enabled) {
     const badge = document.getElementById("statusBadge");
-    const disableBtn = document.getElementById("disableBtn");
-    const enableBtn = document.getElementById("enableBtn");
-
-    if (!badge || !disableBtn || !enableBtn) return;
-
+    const dis = document.getElementById("disableBtn");
+    const en = document.getElementById("enableBtn");
+    if (!badge) return;
     if (enabled) {
-      badge.innerHTML =
-        '<span class="status-dot"></span><span class="status-text">Active</span>';
-      badge.classList.add("on");
-      badge.classList.remove("off");
-
-      disableBtn.style.display = "flex";
-      enableBtn.style.display = "none";
+      badge.innerHTML = '<span class="badge-dot"></span><span class="badge-label">Active</span>';
+      badge.className = "badge on";
+      if (dis) dis.style.display = "";
+      if (en) en.style.display = "none";
     } else {
-      badge.innerHTML =
-        '<span class="status-dot"></span><span class="status-text">Inactive</span>';
-      badge.classList.remove("on");
-      badge.classList.add("off");
-
-      disableBtn.style.display = "none";
-      enableBtn.style.display = "flex";
+      badge.innerHTML = '<span class="badge-dot"></span><span class="badge-label">Inactive</span>';
+      badge.className = "badge off";
+      if (dis) dis.style.display = "none";
+      if (en) en.style.display = "";
     }
   }
 
+  function attachPassphraseGuards(viewSel) {
+    const input = document.querySelector(`${viewSel} .text-input`);
+    if (!input) return;
+    input.addEventListener("paste", (e) => e.preventDefault());
+    input.addEventListener("drop", (e) => e.preventDefault());
+  }
   attachPassphraseGuards(".view-passphrase");
   attachPassphraseGuards(".view-reenter");
 
-  // ---------- Resume cooldown on popup open ----------
-  chrome.storage.local.get(
-    ["enabled", "cooldownUntil"],
-    ({ enabled, cooldownUntil }) => {
-      // If extension is disabled, ignore cooldown completely
-      if (enabled === false) return;
-
-      if (!cooldownUntil) return;
-
-      if (cooldownUntil > Date.now()) {
-        console.log("Resuming active cooldown");
-        showView("view-cooldown");
-        startCooldownTimer(cooldownUntil);
-      } else {
-        console.log("Cooldown expired, requiring re-entry");
-        showView("view-reenter");
-      }
-    },
-  );
-
-  chrome.storage.local.get("enabled", ({ enabled }) => {
-    if (enabled === false) {
-      syncEnabledUI(false);
-    } else {
-      syncEnabledUI(true);
-    }
-  });
-
-  // ---------- Helper: Disable button flow for cooldown ----------
-  function handleDisableFlow() {
-    chrome.storage.local.get(
-      ["enabled", "cooldownUntil"],
-      ({ enabled, cooldownUntil }) => {
-        // If CleanTab is already disabled, never enter disable flow
-        if (enabled === false) {
-          showView("view-normal");
-          return;
-        }
-
-        // No cooldown → normal confirmation
-        if (!cooldownUntil) {
-          showView("view-confirm");
-          return;
-        }
-
-        // Cooldown active
-        if (cooldownUntil > Date.now()) {
-          showView("view-cooldown");
-          startCooldownTimer(cooldownUntil);
-          return;
-        }
-
-        // Cooldown expired → require re-entry
-        showView("view-reenter");
-      },
-    );
-  }
-
-  // ---------- Ring + cumulative display ----------
-  const RING_CIRCUMFERENCE = 301.6; // 2π × r=48
+  // ── Ring display ───────────────────────────────────────────────────────────
+  const CIRC = 477.52; // 2π × r=76
 
   function updateRingDisplay() {
     chrome.storage.local.get(
       ["today", "goalMinutes", "totals"],
       ({ today = {}, goalMinutes = 120, totals = {} }) => {
-        const cleanMinutes = today.cleanMinutes || 0;
-        const pct = Math.min(1, cleanMinutes / goalMinutes);
+        const mins = today.cleanMinutes || 0;
+        const pct = Math.min(1, mins / goalMinutes);
 
-        // Ring arc
-        const fillEl = document.getElementById("ringFill");
+        const fill = document.getElementById("ringFill");
         const pctEl = document.getElementById("ringPct");
-        const subEl = document.getElementById("ringSub");
-        if (fillEl) {
-          const filled = pct * RING_CIRCUMFERENCE;
-          fillEl.setAttribute("stroke-dasharray", `${filled} ${RING_CIRCUMFERENCE}`);
-        }
+        const sub = document.getElementById("ringSub");
+        if (fill) fill.setAttribute("stroke-dasharray", `${pct * CIRC} ${CIRC}`);
         if (pctEl) pctEl.textContent = `${Math.round(pct * 100)}%`;
-        if (subEl) {
-          const remaining = Math.max(0, goalMinutes - cleanMinutes);
-          subEl.textContent = remaining > 0
-            ? `${remaining} min to close the ring`
-            : "Ring closed today";
+        if (sub) {
+          const rem = Math.max(0, goalMinutes - mins);
+          sub.textContent = rem > 0 ? `${rem} min to close` : "Ring closed today";
         }
 
-        // Redirects today (from v1 schema)
-        const redirectsEl = document.getElementById("redirects");
-        if (redirectsEl) redirectsEl.textContent = today.redirects ?? 0;
-
-        // Cumulative
-        const closedEl = document.getElementById("closedDays");
-        const reflEl = document.getElementById("reflectionsTotal");
-        const hrsEl = document.getElementById("lifetimeHours");
-        if (closedEl) closedEl.textContent = totals.closedDays ?? 0;
-        if (reflEl) reflEl.textContent = totals.reflectionsLogged ?? 0;
-        if (hrsEl) hrsEl.textContent = Math.floor((totals.lifetimeCleanMinutes ?? 0) / 60);
-      },
+        const d = document.getElementById("todayRedirects");
+        const c = document.getElementById("closedDays");
+        const r = document.getElementById("reflectionsTotal");
+        if (d) d.textContent = today.redirects ?? 0;
+        if (c) c.textContent = totals.closedDays ?? 0;
+        if (r) r.textContent = totals.reflectionsLogged ?? 0;
+      }
     );
   }
 
   updateRingDisplay();
-
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && (changes.today || changes.totals || changes.goalMinutes)) {
       updateRingDisplay();
     }
   });
 
-  // ---------- Button wiring (NORMAL → CONFIRM → PASSPHRASE) ----------
-  const disableBtn = document.getElementById("disableBtn");
-  const confirmCancel = document.getElementById("confirmCancel");
-  const confirmContinue = document.getElementById("confirmContinue");
-  const enableBtn = document.getElementById("enableBtn");
-
-  if (disableBtn) {
-    disableBtn.addEventListener("click", () => {
-      console.log("Disable clicked");
-      handleDisableFlow();
-    });
-  }
-
-  if (confirmCancel) {
-    confirmCancel.addEventListener("click", () => {
-      console.log("Disable cancelled");
-      showView("view-normal");
-    });
-  }
-
-  if (confirmContinue) {
-    confirmContinue.addEventListener("click", () => {
-      console.log("Confirm continue");
-
-      chrome.storage.local.get("cooldownUntil", ({ cooldownUntil }) => {
-        // Safety: confirmation should only be usable when no cooldown exists
-        if (cooldownUntil && cooldownUntil > Date.now()) {
-          showView("view-cooldown");
-          startCooldownTimer(cooldownUntil);
-          return;
-        }
-
-        // Normal flow
-        showView("view-passphrase");
-      });
-    });
-  }
-
-  if (enableBtn) {
-    enableBtn.addEventListener("click", () => {
-      chrome.storage.local.remove("disableUntil", () => {
-        chrome.storage.local.set({ enabled: true }, () => {
-          console.log("CleanTab enabled");
-          if (disableTimerInterval) clearInterval(disableTimerInterval);
-          syncEnabledUI(true);
-
-          const ringCard = document.getElementById("ringCard");
-          const timerCard = document.getElementById("disableTimerCard");
-          if (ringCard) ringCard.style.display = "flex";
-          if (timerCard) timerCard.style.display = "none";
-        });
-      });
-    });
-  }
-
-  // ---------- Passphrase logic ----------
-  const PASSPHRASE = "I choose long-term focus over short-term impulse.";
-
-  function wirePassphraseView(viewSelector, onSuccess) {
-    const input = document.querySelector(`${viewSelector} .text-input`);
-    const btn = document.querySelector(`${viewSelector} .btn`);
-    if (!input || !btn) return;
-
-    btn.disabled = true;
-    btn.classList.add("disabled");
-
-    input.addEventListener("input", () => {
-      const typed = input.value.trim();
-
-      if (typed === PASSPHRASE) {
-        btn.disabled = false;
-        btn.classList.remove("disabled");
+  // ── Init: enabled state & cooldown ────────────────────────────────────────
+  chrome.storage.local.get(["enabled", "cooldownUntil", "disableUntil"], (data) => {
+    syncEnabledUI(data.enabled !== false);
+    if (data.enabled !== false && data.cooldownUntil) {
+      if (data.cooldownUntil > Date.now()) {
+        showView("view-cooldown");
+        startCooldownTimer(data.cooldownUntil);
       } else {
-        btn.disabled = true;
-        btn.classList.add("disabled");
+        showView("view-reenter");
+      }
+    }
+    if (data.enabled === false && data.disableUntil && data.disableUntil > Date.now()) {
+      startDisableTimer(data.disableUntil);
+    }
+  });
+
+  // ── Disable flow ───────────────────────────────────────────────────────────
+  function handleDisableFlow() {
+    chrome.storage.local.get(["enabled", "cooldownUntil"], ({ enabled, cooldownUntil }) => {
+      if (enabled === false) { showView("view-normal"); return; }
+      if (!cooldownUntil) { showView("view-confirm"); return; }
+      if (cooldownUntil > Date.now()) { showView("view-cooldown"); startCooldownTimer(cooldownUntil); return; }
+      showView("view-reenter");
+    });
+  }
+
+  document.getElementById("disableBtn")?.addEventListener("click", handleDisableFlow);
+  document.getElementById("confirmCancel")?.addEventListener("click", () => showView("view-normal"));
+  document.getElementById("confirmContinue")?.addEventListener("click", () => {
+    chrome.storage.local.get("cooldownUntil", ({ cooldownUntil }) => {
+      if (cooldownUntil && cooldownUntil > Date.now()) {
+        showView("view-cooldown"); startCooldownTimer(cooldownUntil);
+      } else {
+        showView("view-passphrase");
       }
     });
+  });
+  document.getElementById("cancelPassphrase")?.addEventListener("click", () => showView("view-normal"));
+  document.getElementById("cancelCooldown")?.addEventListener("click", () => {
+    chrome.storage.local.remove("cooldownUntil", () => {
+      if (cooldownInterval) clearInterval(cooldownInterval);
+      showView("view-normal");
+    });
+  });
+  document.getElementById("cancelReenter")?.addEventListener("click", () => {
+    chrome.storage.local.remove("cooldownUntil", () => showView("view-normal"));
+  });
+  document.getElementById("cancelDuration")?.addEventListener("click", () => showView("view-normal"));
 
+  document.getElementById("enableBtn")?.addEventListener("click", () => {
+    chrome.storage.local.remove("disableUntil", () => {
+      chrome.storage.local.set({ enabled: true }, () => {
+        if (disableTimerInterval) clearInterval(disableTimerInterval);
+        syncEnabledUI(true);
+        const rc = document.getElementById("ringCard");
+        const tc = document.getElementById("disableTimerCard");
+        if (rc) rc.style.display = "";
+        if (tc) tc.style.display = "none";
+      });
+    });
+  });
+
+  // ── Passphrase wiring ─────────────────────────────────────────────────────
+  const PASSPHRASE = "I choose long-term focus over short-term impulse.";
+
+  function wirePassphrase(viewSel, onSuccess) {
+    const input = document.querySelector(`${viewSel} .text-input`);
+    const btn = document.querySelector(`${viewSel} .btn`);
+    if (!input || !btn) return;
+    btn.disabled = true;
+    btn.classList.add("disabled");
+    input.addEventListener("input", () => {
+      const match = input.value.trim() === PASSPHRASE;
+      btn.disabled = !match;
+      btn.classList.toggle("disabled", !match);
+    });
     input.addEventListener("paste", (e) => e.preventDefault());
     input.addEventListener("drop", (e) => e.preventDefault());
-
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      onSuccess();
-    });
+    btn.addEventListener("click", () => { if (!btn.disabled) onSuccess(); });
   }
 
-  // First passphrase → start cooldown
-  wirePassphraseView(".view-passphrase", () => {
-    const cooldownSeconds = 10;
-    const cooldownUntil = Date.now() + cooldownSeconds * 1000;
-
-    chrome.storage.local.set({ cooldownUntil }, () => {
-      console.log("Cooldown started until:", new Date(cooldownUntil));
+  wirePassphrase(".view-passphrase", () => {
+    const until = Date.now() + 10 * 1000;
+    chrome.storage.local.set({ cooldownUntil: until }, () => {
       showView("view-cooldown");
-      startCooldownTimer(cooldownUntil);
+      startCooldownTimer(until);
     });
   });
 
-  // Re-enter passphrase → Show duration selection
-  wirePassphraseView(".view-reenter", () => {
-    chrome.storage.local.remove("cooldownUntil", () => {
-      console.log("Passphrase confirmed - showing duration selection");
-      showView("view-duration");
-    });
+  wirePassphrase(".view-reenter", () => {
+    chrome.storage.local.remove("cooldownUntil", () => showView("view-duration"));
   });
 
+  // ── Timers ─────────────────────────────────────────────────────────────────
   let cooldownInterval = null;
   let disableTimerInterval = null;
 
-  function startCooldownTimer(cooldownUntil) {
-    const timerEl = document.getElementById("cooldown-timer");
-    if (!timerEl) return;
-
+  function startCooldownTimer(until) {
+    const el = document.getElementById("cooldown-timer");
+    if (!el) return;
     if (cooldownInterval) clearInterval(cooldownInterval);
-
     function tick() {
-      const remaining = cooldownUntil - Date.now();
-
-      if (remaining <= 0) {
-        clearInterval(cooldownInterval);
-        timerEl.textContent = "00:00:00";
-        showView("view-reenter");
-        return;
-      }
-
-      timerEl.textContent = formatTime(remaining);
+      const rem = until - Date.now();
+      if (rem <= 0) { clearInterval(cooldownInterval); el.textContent = "0h 0m 0s"; showView("view-reenter"); return; }
+      el.textContent = formatTime(rem);
     }
-
     tick();
     cooldownInterval = setInterval(tick, 1000);
   }
 
-  const cancelCooldownBtn = document.getElementById("cancelCooldown");
-
-  if (cancelCooldownBtn) {
-    cancelCooldownBtn.addEventListener("click", () => {
-      chrome.storage.local.remove("cooldownUntil", () => {
-        console.log("Cooldown cancelled");
-        if (cooldownInterval) clearInterval(cooldownInterval);
-        showView("view-normal");
-      });
-    });
-  }
-
-  const cancelReenterBtn = document.getElementById("cancelReenter");
-
-  if (cancelReenterBtn) {
-    cancelReenterBtn.addEventListener("click", () => {
-      chrome.storage.local.remove("cooldownUntil", () => {
-        console.log("Re-enter passphrase cancelled");
-        showView("view-normal");
-      });
-    });
-  }
-
-  const cancelPassphraseBtn = document.getElementById("cancelPassphrase");
-
-  if (cancelPassphraseBtn) {
-    cancelPassphraseBtn.addEventListener("click", () => {
-      console.log("Passphrase entry cancelled");
-      showView("view-normal");
-    });
-  }
-
-  // Duration selection handlers
-  const durationButtons = document.querySelectorAll(".duration-btn");
-  const cancelDurationBtn = document.getElementById("cancelDuration");
-
-  durationButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const minutes = parseInt(btn.dataset.minutes);
-      const disableUntil = Date.now() + minutes * 60 * 1000;
-
-      chrome.storage.local.set(
-        { enabled: false, streak: 1, disableUntil },
-        () => {
-          console.log(
-            `CleanTab disabled for ${minutes} minutes - streak reset to 1`,
-          );
-          showView("view-normal");
-          syncEnabledUI(false);
-          startDisableTimer(disableUntil);
-        },
-      );
-    });
-  });
-
-  if (cancelDurationBtn) {
-    cancelDurationBtn.addEventListener("click", () => {
-      console.log("Duration selection cancelled");
-      showView("view-normal");
-    });
-  }
-
-  // Disable timer management
-  function startDisableTimer(disableUntil) {
-    const timerEl = document.getElementById("disableTimer");
-    const ringCard = document.getElementById("ringCard");
-    const timerCard = document.getElementById("disableTimerCard");
-
-    if (!timerEl || !ringCard || !timerCard) return;
-
-    // Show timer, hide ring
-    ringCard.style.display = "none";
-    timerCard.style.display = "flex";
-
+  function startDisableTimer(until) {
+    const el = document.getElementById("disableTimer");
+    const rc = document.getElementById("ringCard");
+    const tc = document.getElementById("disableTimerCard");
+    if (!el) return;
+    if (rc) rc.style.display = "none";
+    if (tc) tc.style.display = "flex";
     if (disableTimerInterval) clearInterval(disableTimerInterval);
-
     function tick() {
-      const remaining = disableUntil - Date.now();
-
-      if (remaining <= 0) {
+      const rem = until - Date.now();
+      if (rem <= 0) {
         clearInterval(disableTimerInterval);
-        // Auto re-enable
         chrome.storage.local.remove("disableUntil", () => {
           chrome.storage.local.set({ enabled: true }, () => {
-            console.log("CleanTab auto-enabled after timer expired");
             syncEnabledUI(true);
-            ringCard.style.display = "flex";
-            timerCard.style.display = "none";
+            if (rc) rc.style.display = "";
+            if (tc) tc.style.display = "none";
           });
         });
         return;
       }
-
-      const minutes = Math.floor(remaining / 60000);
-      const seconds = Math.floor((remaining % 60000) / 1000);
-      timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+      const m = Math.floor(rem / 60000);
+      const s = Math.floor((rem % 60000) / 1000);
+      el.textContent = `${m}:${String(s).padStart(2, "0")}`;
     }
-
     tick();
     disableTimerInterval = setInterval(tick, 1000);
   }
 
-  // Check for active disable timer on popup open
-  chrome.storage.local.get(
-    ["enabled", "disableUntil"],
-    ({ enabled, disableUntil }) => {
-      if (enabled === false && disableUntil && disableUntil > Date.now()) {
-        startDisableTimer(disableUntil);
-      }
-    },
-  );
+  // ── Duration buttons ───────────────────────────────────────────────────────
+  document.querySelectorAll(".dur-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mins = parseInt(btn.dataset.minutes);
+      const until = Date.now() + mins * 60 * 1000;
+      chrome.storage.local.set({ enabled: false, disableUntil: until }, () => {
+        showView("view-normal");
+        syncEnabledUI(false);
+        startDisableTimer(until);
+      });
+    });
+  });
 
-  // ── Heatmap (Phase 7) ──────────────────────────────────────────────────────
-  function localDateKey() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    const d = String(now.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }
-
-  function dateMinusDays(n) {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${mo}-${day}`;
-  }
-
+  // ── Heatmap (16-week calendar grid) ───────────────────────────────────────
   function renderHeatmap(history, goalMinutes, todayData) {
     const grid = document.getElementById("heatmapGrid");
     if (!grid) return;
     grid.innerHTML = "";
 
     const todayKey = localDateKey();
+    const today = new Date();
+    // Align so rightmost column ends at Sunday of current week
+    const dow = (today.getDay() + 6) % 7; // Mon=0 … Sun=6
+    const daysToSunday = 6 - dow;
+    const gridEnd = new Date(today);
+    gridEnd.setDate(gridEnd.getDate() + daysToSunday);
 
-    for (let i = 29; i >= 0; i--) {
-      const key = dateMinusDays(i);
-      let pct = 0;
-      let hasData = false;
+    const TOTAL = 16 * 7; // 112 cells
 
-      if (key === todayKey && todayData) {
-        pct = Math.min(1, (todayData.cleanMinutes || 0) / (goalMinutes || 120));
-        hasData = true;
-      } else if (history[key]) {
-        const d = history[key];
-        pct = Math.min(1, (d.cleanMinutes || 0) / (d.goalMinutes || goalMinutes || 120));
-        hasData = true;
+    for (let i = TOTAL - 1; i >= 0; i--) {
+      const d = new Date(gridEnd);
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      const isFuture = d > today;
+
+      let pct = -1;
+      if (!isFuture) {
+        if (key === todayKey && todayData) {
+          pct = Math.min(1, (todayData.cleanMinutes || 0) / (goalMinutes || 120));
+        } else if (history[key]) {
+          const h = history[key];
+          pct = Math.min(1, (h.cleanMinutes || 0) / (h.goalMinutes || goalMinutes || 120));
+        } else {
+          pct = 0;
+        }
       }
 
       const cell = document.createElement("div");
-      cell.className = "heatmap-cell";
-      cell.title = key;
+      cell.className = "hm-cell";
+      cell.title = isFuture ? "" : key;
 
-      if (!hasData) {
-        cell.style.background = "#f0f0f0";
-      } else if (pct >= 1) {
-        cell.style.background = "#FF6B35";
-      } else if (pct >= 0.75) {
-        cell.style.background = "#ffb899";
-      } else if (pct >= 0.5) {
-        cell.style.background = "#ffd4c2";
-      } else if (pct >= 0.25) {
-        cell.style.background = "#ffe8df";
-      } else {
-        cell.style.background = "#f5f5f5";
-      }
+      if (isFuture) {
+        cell.style.background = "transparent";
+        cell.style.border = "1px solid #1A1A1A";
+      } else if (pct >= 1)    cell.style.background = "#FF6B35";
+      else if (pct >= 0.75)   cell.style.background = "#CC4B1F";
+      else if (pct >= 0.5)    cell.style.background = "#8B3015";
+      else if (pct >= 0.25)   cell.style.background = "#4A1A0A";
+      else if (pct > 0)       cell.style.background = "#2A1208";
+      else                    cell.style.background = "#1C1C1C";
 
       grid.appendChild(cell);
     }
   }
 
-  // ── Insights (Phase 9) ─────────────────────────────────────────────────────
-  const CHIP_LABELS = {
-    bored: "Bored", stressed: "Stressed", habit: "Habit",
-    avoiding: "Avoiding", lonely: "Lonely", tired: "Tired",
-  };
+  // ── Insights ───────────────────────────────────────────────────────────────
+  const CHIPS = { bored:"Bored", stressed:"Stressed", habit:"Habit", avoiding:"Avoiding", lonely:"Lonely", tired:"Tired" };
 
   function renderInsights(reflections, totals) {
     const section = document.getElementById("insightsSection");
-    if (!section) return;
-    if ((totals.reflectionsLogged || 0) < 10) return;
+    const emptyEl = document.getElementById("insightsEmpty");
+    const bars = document.getElementById("triggerBars");
+    if (!section || !bars) return;
 
+    if ((totals.reflectionsLogged || 0) < 10) {
+      section.style.display = "none";
+      if (emptyEl) emptyEl.style.display = "";
+      return;
+    }
+
+    if (emptyEl) emptyEl.style.display = "none";
     section.style.display = "flex";
+    bars.innerHTML = "";
 
     const counts = {};
-    Object.keys(CHIP_LABELS).forEach((k) => (counts[k] = 0));
+    Object.keys(CHIPS).forEach((k) => counts[k] = 0);
     reflections.forEach((r) => { if (counts[r.chip] !== undefined) counts[r.chip]++; });
 
     const total = reflections.length || 1;
     const max = Math.max(...Object.values(counts), 1);
 
-    const barsEl = document.getElementById("triggerBars");
-    barsEl.innerHTML = "";
-
     Object.entries(counts)
-      .sort(([, a], [, b]) => b - a)
-      .filter(([, count]) => count > 0)
+      .sort(([,a],[,b]) => b - a)
+      .filter(([,c]) => c > 0)
       .forEach(([chip, count]) => {
         const pct = Math.round((count / total) * 100);
-        const bar = document.createElement("div");
-        bar.className = "trigger-bar";
-        bar.innerHTML = `
-          <span class="trigger-name">${CHIP_LABELS[chip]}</span>
-          <div class="trigger-track">
-            <div class="trigger-fill" style="width:${(count / max) * 100}%"></div>
-          </div>
-          <span class="trigger-pct">${pct}%</span>
-        `;
-        barsEl.appendChild(bar);
+        const row = document.createElement("div");
+        row.className = "trigger-bar";
+        row.innerHTML = `
+          <span class="trigger-name">${CHIPS[chip]}</span>
+          <div class="trigger-track"><div class="trigger-fill" style="width:${(count/max)*100}%"></div></div>
+          <span class="trigger-pct">${pct}%</span>`;
+        bars.appendChild(row);
       });
   }
 
-  // Load heatmap + insights on open and on storage change
-  function loadSupplementaryData() {
+  function loadProgress() {
     chrome.storage.local.get(
-      ["history", "goalMinutes", "today", "totals", "reflections"],
-      ({ history = {}, goalMinutes = 120, today = {}, totals = {}, reflections = [] }) => {
+      ["history","goalMinutes","today","totals","reflections"],
+      ({ history={}, goalMinutes=120, today={}, totals={}, reflections=[] }) => {
         renderHeatmap(history, goalMinutes, today);
         renderInsights(reflections, totals);
-      },
+      }
     );
   }
 
-  loadSupplementaryData();
-
+  loadProgress();
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && (changes.history || changes.reflections || changes.today)) {
-      loadSupplementaryData();
+      loadProgress();
     }
   });
 
-  // ── Export / Import (Phase 11) ─────────────────────────────────────────────
+  // ── Export / Import ────────────────────────────────────────────────────────
   document.getElementById("exportBtn")?.addEventListener("click", () => {
     chrome.storage.local.get(null, (data) => {
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `cleantab-backup-${localDateKey()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const a = Object.assign(document.createElement("a"), { href: url, download: `cleantab-${localDateKey()}.json` });
+      document.body.append(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     });
   });
@@ -562,17 +378,12 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (!data.schemaVersion) throw new Error("Invalid backup");
-        chrome.storage.local.set(data, () => {
-          alert("Data restored. Reopen the popup to see your history.");
-        });
-      } catch {
-        alert("Could not read this file. Make sure it is a valid CleanTab backup.");
-      }
+        if (!data.schemaVersion) throw new Error();
+        chrome.storage.local.set(data, () => alert("Data restored. Reopen the popup."));
+      } catch { alert("Invalid CleanTab backup file."); }
     };
     reader.readAsText(file);
     e.target.value = "";
   });
 
 });
-

@@ -1,37 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to CleanTab</title>
-  <link rel="stylesheet" href="onboarding.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CleanTab — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="onboarding.css"/>
 </head>
 <body>
-  <div class="container">
+<div class="page">
 
-    <header class="header">
-      <div class="logo">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" fill="#FF6B35" opacity="0.12"/>
-          <path d="M12 6V12L16 14" stroke="#FF6B35" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span class="logo-text"><span class="accent">Clean</span>Tab</span>
-      </div>
-    </header>
+  <nav class="topbar">
+    <div class="wordmark"><span class="accent">Clean</span>Tab</div>
+  </nav>
 
-    <main class="main">
-      <p class="headline">You installed CleanTab.</p>
+  <main class="main">
+    <div class="hero">
+      <div class="step-chip">Setup</div>
+      <h1 class="headline">One question<br/>before we start.</h1>
+      <p class="sub">This sets your daily focus goal. You can always adjust later.</p>
+    </div>
 
-      <p class="body-text">
-        It flags pages that pull you off-track and quietly tracks
-        your clean browsing time each day.
-      </p>
-
-      <p class="privacy-note">Nothing leaves your device.</p>
-
-      <div class="divider"></div>
-
-      <p class="question">How much do you use your laptop on a normal day?</p>
+    <div class="question-block">
+      <p class="question">How many hours do you typically use your laptop on a normal day?</p>
 
       <div class="chips" id="chips">
         <button class="chip" data-hours="1.5">1–2 hrs</button>
@@ -41,10 +33,20 @@
         <button class="chip" data-hours="9">8+ hrs</button>
       </div>
 
-      <button class="done-btn" id="doneBtn" disabled>Done</button>
-    </main>
+      <div class="goal-preview" id="goalPreview" style="opacity:0">
+        <span class="goal-label">Your daily ring goal</span>
+        <span class="goal-val" id="goalVal">—</span>
+        <span class="goal-unit">min of clean browsing</span>
+      </div>
+    </div>
 
-  </div>
-  <script src="onboarding.js"></script>
+    <div class="footer-row">
+      <p class="privacy">Nothing leaves your device.</p>
+      <button class="done-btn" id="doneBtn" disabled>Get started →</button>
+    </div>
+  </main>
+
+</div>
+<script src="onboarding.js"></script>
 </body>
 </html>
