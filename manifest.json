@@ -35,8 +35,7 @@
     {
       "resources": [
         "redirect/redirect.html",
-        "onboarding/onboarding.html",
-        "vendor/nsfwjs/model/*"
+        "onboarding/onboarding.html"
       ],
       "matches": ["<all_urls>"]
     }

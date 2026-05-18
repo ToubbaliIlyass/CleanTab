@@ -2,15 +2,7 @@
 <html>
 <head><meta charset="UTF-8"></head>
 <body>
-<!--
-  Model files required in vendor/:
-    vendor/tfjs/tf.min.js       — https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js
-    vendor/nsfwjs/nsfwjs.min.js — https://cdn.jsdelivr.net/npm/nsfwjs/dist/nsfwjs.min.js
-    vendor/nsfwjs/model/        — model.json + group1-shard*.bin files from the nsfwjs package
-
-  Install via: npx nsfwjs-download (or copy from node_modules/nsfwjs/dist/inception_v3/)
--->
-<script src="../vendor/tfjs/tf.min.js"></script>
+<!-- nsfwjs.min.js is self-contained: bundles TF.js + MobileNetV2 model weights. -->
 <script src="../vendor/nsfwjs/nsfwjs.min.js"></script>
 <script src="offscreen.js"></script>
 </body>

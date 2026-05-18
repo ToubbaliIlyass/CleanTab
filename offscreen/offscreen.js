@@ -2,8 +2,8 @@ let model = null;
 
 async function loadModel() {
   if (model) return model;
-  const modelUrl = chrome.runtime.getURL("vendor/nsfwjs/model/model.json");
-  model = await nsfwjs.load(modelUrl, { type: "graph" });
+  // nsfwjs.min.js is self-contained — MobileNetV2 weights are embedded in the bundle.
+  model = await nsfwjs.load();
   return model;
 }
 
