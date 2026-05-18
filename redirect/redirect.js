@@ -2,271 +2,145 @@ document.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(window.location.search);
   const reason = params.get("reason");
   const originalUrl = params.get("original");
+  const domain = (() => { try { return new URL(originalUrl).hostname; } catch { return ""; } })();
 
+  // ── Reason text ───────────────────────────────────────────────────────────
   const reasonEl = document.getElementById("reason-text");
-  if (reasonEl) {
-    reasonEl.textContent =
-      reason ||
-      "This site is known to contain explicit content and was blocked automatically.";
-  }
+  if (reasonEl && reason) reasonEl.textContent = reason;
 
-  const appealBtn = document.getElementById("appeal-btn");
-  const appealStatus = document.createElement("div");
-  appealStatus.id = "appeal-status";
-  appealStatus.className = "appeal-status";
+  // ── First-time note ───────────────────────────────────────────────────────
+  chrome.storage.local.get(["firstRedirectSeen"], ({ firstRedirectSeen }) => {
+    if (!firstRedirectSeen) {
+      const note = document.getElementById("firstTimeNote");
+      if (note) note.style.display = "block";
+      chrome.storage.local.set({ firstRedirectSeen: true });
+    }
+  });
 
-  if (appealBtn) {
-    appealBtn.parentNode.insertBefore(appealStatus, appealBtn.nextSibling);
+  // ── Reflection chips ──────────────────────────────────────────────────────
+  const chipsEl = document.getElementById("chips");
+  const confirmEl = document.getElementById("chipConfirm");
+  const confirmText = document.getElementById("confirmText");
+  const confirmCount = document.getElementById("confirmCount");
 
-    appealBtn.addEventListener("click", () => {
-      // Reset states and show processing
-      appealBtn.disabled = true;
-      appealBtn.className = "appeal-button processing";
-      appealBtn.textContent = "Processing appeal...";
-      appealStatus.className = "appeal-status";
-      appealStatus.innerHTML = "";
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (confirmEl.style.display !== "none") return; // already logged
 
-      chrome.runtime.sendMessage({ action: "appealRequest" }, (response) => {
-        console.log("Appeal response received:", response);
+      chip.classList.add("selected");
 
-        // Check if we received any response at all
-        if (!response) {
-          console.error("No response received from background script");
-          appealBtn.className = "appeal-button error";
-          appealBtn.textContent = "⚠️ Connection Error";
+      const chipName = chip.dataset.chip;
 
-          appealStatus.className = "appeal-status error show";
-          appealStatus.innerHTML = `
-            <div><strong>⚠️ Connection Error</strong></div>
-            <div style="margin-top: 6px; font-weight: 400;">Unable to communicate with the background service. Please reload the page and try again.</div>
-          `;
+      // Write to storage
+      chrome.storage.local.get(["today", "totals", "reflections"], (data) => {
+        const today = { ...(data.today || {}) };
+        today.reflections = (today.reflections || 0) + 1;
 
-          setTimeout(() => {
-            appealBtn.disabled = false;
-            appealBtn.className = "";
-            appealBtn.textContent = "Try Again";
-          }, 5000);
+        const totals = { ...(data.totals || {}) };
+        totals.reflectionsLogged = (totals.reflectionsLogged || 0) + 1;
+
+        const reflections = [...(data.reflections || [])];
+        reflections.push({ ts: Date.now(), chip: chipName, domain });
+        while (reflections.length > 1000) reflections.shift();
+
+        chrome.storage.local.set({ today, totals, reflections }, () => {
+          // Show confirmation
+          chipsEl.style.pointerEvents = "none";
+          chipsEl.style.opacity = "0.5";
+          confirmEl.style.display = "block";
+          confirmText.textContent = "Logged.";
+          if (totals.reflectionsLogged > 1) {
+            confirmCount.textContent = `${totals.reflectionsLogged - 1} → ${totals.reflectionsLogged} reflections`;
+          }
+        });
+      });
+    });
+  });
+
+  // ── Take a beat (breathing animation) ─────────────────────────────────────
+  const overlay = document.getElementById("breathingOverlay");
+  const circle = document.getElementById("breathingCircle");
+  const label = document.getElementById("breathingLabel");
+  const skipBtn = document.getElementById("breathingSkip");
+  const breatheBtn = document.getElementById("breatheBtn");
+
+  const PHASES = [
+    { cls: "inhale", text: "Breathe in",  ms: 4000 },
+    { cls: "hold",   text: "Hold",         ms: 4000 },
+    { cls: "exhale", text: "Breathe out",  ms: 4000 },
+  ];
+  const CYCLES = 3;
+
+  function runBreathing() {
+    overlay.classList.add("active");
+    let cycle = 0;
+    let phaseIdx = 0;
+
+    function nextPhase() {
+      if (!overlay.classList.contains("active")) return;
+
+      const { cls, text, ms } = PHASES[phaseIdx];
+      circle.className = "breathing-circle " + cls;
+      label.textContent = text;
+
+      phaseIdx++;
+      if (phaseIdx >= PHASES.length) {
+        phaseIdx = 0;
+        cycle++;
+        if (cycle >= CYCLES) {
+          setTimeout(() => overlay.classList.remove("active"), ms);
           return;
         }
+      }
 
-        // Check for unknown response format
-        if (!response.status) {
-          console.error("Invalid response format:", response);
-          appealBtn.className = "error";
-          appealBtn.textContent = "⚠️ Invalid Response";
+      setTimeout(nextPhase, ms);
+    }
 
-          appealStatus.className = "appeal-status error show";
-          appealStatus.innerHTML = `
-            <div><strong>⚠️ Invalid Response</strong></div>
-            <div style="margin-top: 6px; font-weight: 400;">Received unexpected response format. Please try again.</div>
-          `;
+    nextPhase();
+  }
 
-          setTimeout(() => {
-            appealBtn.disabled = false;
-            appealBtn.className = "";
-            appealBtn.textContent = "Try Again";
-          }, 3000);
+  if (breatheBtn) breatheBtn.addEventListener("click", runBreathing);
+  if (skipBtn) skipBtn.addEventListener("click", () => overlay.classList.remove("active"));
+
+  // ── Appeal ─────────────────────────────────────────────────────────────────
+  const appealBtn = document.getElementById("appeal-btn");
+  const appealStatus = document.getElementById("appeal-status");
+
+  if (appealBtn) {
+    appealBtn.addEventListener("click", () => {
+      appealBtn.disabled = true;
+      appealBtn.textContent = "Checking…";
+      if (appealStatus) {
+        appealStatus.className = "appeal-status";
+        appealStatus.textContent = "";
+      }
+
+      chrome.runtime.sendMessage({ action: "appealRequest" }, (response) => {
+        if (!response) {
+          appealStatus.className = "appeal-status error";
+          appealStatus.textContent = "Could not reach the extension. Try reloading the page.";
+          appealBtn.disabled = false;
+          appealBtn.textContent = "This was wrongly flagged";
           return;
         }
 
         if (response.status === "approved") {
-          // Success state
-          appealBtn.className = "appeal-button success";
-          appealBtn.textContent = "✅ Appeal Approved";
-
-          if (response.aiApproved) {
-            appealStatus.className = "appeal-status ai-approved show";
-            appealStatus.innerHTML = `
-              <div><strong>🤖 AI Analysis Approved</strong></div>
-              <div style="margin-top: 6px; font-weight: 400;">${response.reason}</div>
-            `;
-          } else {
-            appealStatus.className = "appeal-status success show";
-            appealStatus.innerHTML = `
-              <div><strong>🎉 Appeal Approved</strong></div>
-              <div style="margin-top: 6px; font-weight: 400;">${response.reason}</div>
-            `;
-          }
+          appealStatus.className = "appeal-status approved";
+          appealStatus.textContent = response.reason || "Approved — taking you back.";
+          appealBtn.textContent = "Approved";
 
           setTimeout(() => {
-            appealStatus.innerHTML = `
-              <div><strong>🔄 Redirecting to original page...</strong></div>
-              <div style="margin-top: 6px; font-weight: 400;">Taking you back in a moment.</div>
-            `;
-            setTimeout(() => {
-              window.location.href = response.originalUrl || originalUrl || "/";
-            }, 1000);
-          }, 2500);
-        } else if (response.status === "denied") {
-          if (response.permanent) {
-            appealBtn.className = "appeal-button error";
-            appealBtn.textContent = "🚫 Cannot Appeal";
-            appealBtn.disabled = true;
-
-            appealStatus.className = "appeal-status error show";
-            appealStatus.innerHTML = `
-              <div><strong>⛔ Permanently Blocked</strong></div>
-              <div style="margin-top: 6px; font-weight: 400;">${response.reason}</div>
-            `;
-          } else if (response.cooldown) {
-            appealBtn.className = "appeal-button warning";
-            appealBtn.textContent = "⏰ Rate Limited";
-
-            appealStatus.className = "appeal-status warning show";
-            appealStatus.innerHTML = `
-              <div><strong>⏱️ Too Many Appeals</strong></div>
-              <div style="margin-top: 6px; font-weight: 400;">${response.reason}</div>
-            `;
-
-            setTimeout(() => {
-              appealBtn.disabled = false;
-              appealBtn.className = "appeal-button";
-              appealBtn.textContent = "Try Appeal Again";
-            }, 8000);
-          } else {
-            appealBtn.className = "appeal-button error";
-            appealBtn.textContent = "❌ Appeal Denied";
-
-            let statusContent = `
-              <div><strong>❌ Appeal Denied</strong></div>
-              <div style="margin-top: 6px; font-weight: 400;">${response.reason}</div>
-            `;
-
-            if (response.aiAnalyzed) {
-              statusContent += `<small>AI Confidence: ${Math.round((response.confidence || 0) * 100)}%</small>`;
-            }
-
-            if (response.reviewable) {
-              statusContent += `<small>You can try appealing again later if this was blocked incorrectly.</small>`;
-            }
-
-            appealStatus.className = "appeal-status error show";
-            appealStatus.innerHTML = statusContent;
-
-            setTimeout(() => {
-              appealBtn.disabled = false;
-              appealBtn.className = "appeal-button";
-              appealBtn.textContent = "Try Again Later";
-            }, 10000);
-          }
+            window.location.href = response.originalUrl || originalUrl || "/";
+          }, 1500);
         } else {
-          // This should now be very rare - only for truly unexpected responses
-          console.error("Unexpected appeal response status:", response);
-          appealBtn.className = "appeal-button error";
-          appealBtn.textContent = "⚠️ Unexpected Error";
-
-          appealStatus.className = "appeal-status error show";
-          appealStatus.innerHTML = `
-            <div><strong>⚠️ Unexpected Error</strong></div>
-            <div style="margin-top: 6px; font-weight: 400;">Received an unexpected response. Please try again or reload the page.</div>
-          `;
-
+          appealStatus.className = "appeal-status denied";
+          appealStatus.textContent = response.reason || "This page remains blocked.";
           setTimeout(() => {
             appealBtn.disabled = false;
-            appealBtn.className = "appeal-button";
-            appealBtn.textContent = "Try Again";
-          }, 5000);
+            appealBtn.textContent = "This was wrongly flagged";
+          }, 8000);
         }
       });
     });
-  }
-
-  // ========================
-  // New Features Implementation
-  // ========================
-
-  // Load and display streak
-  function loadStreak() {
-    chrome.storage.local.get(["streak"], (data) => {
-      const streak = data.streak || 1;
-      const streakElement = document.getElementById("streakValue");
-      if (streakElement) {
-        streakElement.textContent = `Day ${streak}`;
-      }
-    });
-  }
-
-  // Micro-actions list
-  const microActions = [
-    "Do 10 pushups",
-    "Drink a glass of water",
-    "Clean your desk for 2 minutes",
-    "Review your goals",
-    "Read 1 page of a book",
-    "Journal 3 lines",
-    "Take 5 deep breaths",
-    "Stretch for 30 seconds",
-    "Write down one thing you're grateful for",
-    "Tidy up your immediate area",
-  ];
-
-  // 60-second countdown functionality
-  function startCountdown() {
-    const overlay = document.getElementById("countdownOverlay");
-    const numberElement = document.getElementById("countdownNumber");
-    const skipButton = document.getElementById("countdownSkip");
-
-    if (!overlay || !numberElement) return;
-
-    let timeLeft = 60;
-    overlay.classList.add("active");
-
-    const interval = setInterval(() => {
-      timeLeft--;
-      numberElement.textContent = timeLeft;
-
-      if (timeLeft <= 0) {
-        clearInterval(interval);
-        showCompletionMessage();
-      }
-    }, 1000);
-
-    // Skip functionality
-    skipButton.onclick = () => {
-      clearInterval(interval);
-      overlay.classList.remove("active");
-    };
-
-    function showCompletionMessage() {
-      overlay.classList.add("countdown-complete");
-      numberElement.textContent = "You're back in control.";
-
-      setTimeout(() => {
-        overlay.classList.remove("active");
-        overlay.classList.remove("countdown-complete");
-        numberElement.textContent = "60"; // Reset for next use
-      }, 3000);
-    }
-  }
-
-  // Random micro-action generator
-  function generateMicroAction() {
-    const randomIndex = Math.floor(Math.random() * microActions.length);
-    const action = microActions[randomIndex];
-    const descriptionElement = document.getElementById("microDescription");
-
-    if (descriptionElement) {
-      descriptionElement.textContent = action;
-
-      // Reset after 5 seconds
-      setTimeout(() => {
-        descriptionElement.textContent = "Build momentum with micro-habits";
-      }, 5000);
-    }
-  }
-
-  // Initialize new features
-  loadStreak();
-
-  // Connect buttons to functionality
-  const resetButton = document.getElementById("resetButton");
-  const microActionButton = document.getElementById("microActionButton");
-
-  if (resetButton) {
-    resetButton.addEventListener("click", startCountdown);
-  }
-
-  if (microActionButton) {
-    microActionButton.addEventListener("click", generateMicroAction);
   }
 });

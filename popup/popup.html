@@ -6,6 +6,15 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <!-- SVG defs for ring gradient (hidden) -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#FF6B35"/>
+        <stop offset="100%" stop-color="#f7931e"/>
+      </linearGradient>
+    </defs>
+  </svg>
   <div class="popup">
 
     <!-- ===================== -->
@@ -37,24 +46,59 @@
         </div>
 
         <section class="stats-container">
-          <div class="streak-card" id="streakCard">
-            <div class="streak-value" id="streakValue">1</div>
-            <div class="streak-label">Day Streak</div>
-            <div class="streak-sub" id="streakSub">Building consistency</div>
-            <div class="streak-icon">🔥</div>
+
+          <!-- Ring card (daily) -->
+          <div class="ring-card" id="ringCard">
+            <div class="ring-wrap">
+              <svg class="ring-svg" viewBox="0 0 120 120" width="120" height="120">
+                <circle class="ring-track" cx="60" cy="60" r="48"/>
+                <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="48"
+                  stroke-dasharray="0 301.6"
+                  stroke-dashoffset="0"
+                  transform="rotate(-90 60 60)"/>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-pct" id="ringPct">0%</span>
+              </div>
+            </div>
+            <div class="ring-meta">
+              <span class="ring-label">Clean browsing today</span>
+              <span class="ring-sub" id="ringSub">Goal: calculating…</span>
+            </div>
           </div>
 
+          <!-- Disable timer (replaces ring card while disabled) -->
           <div class="disable-timer-card" id="disableTimerCard" style="display:none;">
             <div class="disable-timer-label">Protection resumes in</div>
             <div class="disable-timer-display" id="disableTimer">--:--</div>
             <div class="disable-timer-sublabel">CleanTab will auto-enable</div>
           </div>
 
+          <!-- Cumulative card (lifetime) -->
+          <div class="cumulative-card" id="cumulativeCard">
+            <div class="cumul-stat">
+              <span class="cumul-value" id="closedDays">0</span>
+              <span class="cumul-label">Closed days</span>
+            </div>
+            <div class="cumul-divider"></div>
+            <div class="cumul-stat">
+              <span class="cumul-value" id="reflectionsTotal">0</span>
+              <span class="cumul-label">Reflections</span>
+            </div>
+            <div class="cumul-divider"></div>
+            <div class="cumul-stat">
+              <span class="cumul-value" id="lifetimeHours">0</span>
+              <span class="cumul-label">Lifetime hrs</span>
+            </div>
+          </div>
+
+          <!-- Blocks today -->
           <div class="stat-card">
             <div class="stat-value" id="redirects">0</div>
             <div class="stat-label">Blocks Today</div>
             <div class="stat-icon">🛡️</div>
           </div>
+
         </section>
 
         <section class="controls">
@@ -78,6 +122,29 @@
             </svg>
           </button>
         </section>
+
+        <!-- Heatmap (Phase 7) -->
+        <section class="heatmap-section">
+          <div class="heatmap-header">
+            <span class="section-label">Last 30 days</span>
+          </div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </section>
+
+        <!-- Insights (Phase 9 — shown after 10+ reflections) -->
+        <section class="insights-section" id="insightsSection" style="display:none;">
+          <div class="section-label">Your patterns</div>
+          <div class="trigger-bars" id="triggerBars"></div>
+        </section>
+
+        <!-- Export / Import (Phase 11) -->
+        <div class="data-row">
+          <button class="data-btn" id="exportBtn">Export data</button>
+          <span class="data-sep">·</span>
+          <button class="data-btn" id="importBtn">Import data</button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+
       </div>
 
       <footer class="footer">

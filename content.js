@@ -82,38 +82,24 @@ const keywordWeights = {
   fuck: 2,
 };
 
-const adultAnchors = new Set([
-  "porn",
-  "nsfw",
-  "xxx",
-  "cam",
-  "cams",
-  "hentai",
-  "bdsm",
-  "nude",
-]);
+function buildKeywordRegex(keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const trailingBoundary = /\w$/.test(keyword) ? "\\b" : "";
+  return new RegExp(`\\b${escaped}${trailingBoundary}`, "i");
+}
 
-const adultContext = new Set([
-  "model",
-  "models",
-  "private",
-  "room",
-  "girls",
-  "chat",
-  "show",
-  "studio",
-]);
+const keywordRegexes = Object.entries(keywordWeights).map(([keyword, weight]) => ({
+  regex: buildKeywordRegex(keyword),
+  weight,
+}));
 
 function getKeywordScore(text) {
   let score = 0;
-  const lower = text.toLowerCase();
-
-  for (const [keyword, weight] of Object.entries(keywordWeights)) {
-    if (lower.includes(keyword)) {
+  for (const { regex, weight } of keywordRegexes) {
+    if (regex.test(text)) {
       score += weight;
     }
   }
-
   return score;
 }
 
@@ -174,6 +160,11 @@ function isYouTubeSearch(url) {
   return url.includes("youtube.com/results");
 }
 
+const PASSTHROUGH_PARAMS = new Set([
+  "continue", "redirect_uri", "redirect", "next", "return_to",
+  "returnto", "state", "url", "dest", "destination", "goto",
+]);
+
 ///////////////////////////////
 // URL Scoring (Strong Signal)
 ///////////////////////////////
@@ -181,16 +172,14 @@ function getURLScore(url) {
   let score = 0;
   const lower = url.toLowerCase();
 
-  // Use consistent keyword scoring
   score += getKeywordScore(lower);
 
-  // ---- Search Query Intent ---- //
   try {
     const params = new URL(url).searchParams;
 
     for (const [key, value] of params.entries()) {
+      if (PASSTHROUGH_PARAMS.has(key.toLowerCase())) continue;
       const v = (value || "").toLowerCase();
-      // Add extra weight for search intent
       score += getKeywordScore(v) * 1.5;
     }
   } catch (e) {
@@ -318,11 +307,6 @@ function scan() {
     const environmentScore = getEnvironmentScore();
     const riskyEnvironment = environmentScore >= 5;
 
-    // Environment without intent should never redirect
-    if (riskyEnvironment && !inside) {
-      // context only, wait for intent
-    }
-
     // ----------------------------------
     // 1. Strong URL intent (global)
     // ----------------------------------
@@ -331,21 +315,6 @@ function scan() {
       chrome.runtime.sendMessage({
         action: "redirect",
         reason: "Search or link contained high-risk keywords",
-      });
-      setTimeout(resetRedirectProtection, 1500);
-      return;
-    }
-
-    // ----------------------------------
-    // 2. YouTube-specific logic
-    // ----------------------------------
-
-    // Only flag YouTube if EXPLICIT SEARCH intent
-    if (isYouTubeSearch(url) && urlScore >= 5) {
-      redirectTriggered = true;
-      chrome.runtime.sendMessage({
-        action: "redirect",
-        reason: "YouTube search intent matched high-risk keywords",
       });
       setTimeout(resetRedirectProtection, 1500);
       return;

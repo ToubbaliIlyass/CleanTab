@@ -3,120 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stay Focused — CleanTab</title>
+  <title>CleanTab — Pause</title>
   <link rel="stylesheet" href="redirect.css" />
-  <script src="redirect.js"></script>
 </head>
-
 <body>
-  <div class="container">
-    <div class="card">
-      <!-- Header Section -->
-      <div class="header">
-        <div class="icon-circle">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L3 7V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V7L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <h1 class="title">You're Protected</h1>
-        <p class="subtitle">
-          This page was blocked to help you stay focused.<br/>
-          Choose your next step mindfully.
-        </p>
-      </div>
 
-      <!-- Reason Box -->
-      <div class="info-section">
-        <div class="reason-box">
-          <div class="reason-label">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M8 4V8M8 11H8.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <span>Why this was blocked</span>
-          </div>
-          <p id="reason-text" class="reason-text">Content filtered for your wellbeing</p>
-        </div>
-        <div class="appeal-button-container">
-          <button id="appeal-btn" class="appeal-button">
-            Was this blocked by mistake?
-          </button>
-        </div>
-      </div>
-
-      <!-- Productive Actions -->
-      <div class="actions-section">
-        <!-- Streak Card -->
-        <div class="streak-display">
-          <div class="streak-icon">🔥</div>
-          <div class="streak-content">
-            <div class="streak-value" id="streakValue">Day 1</div>
-            <div class="streak-subtitle">Protect your progress.</div>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-          <button class="reset-button" id="resetButton">
-            <div class="reset-content">
-              <div class="reset-title">Take 60-Second Reset</div>
-              <div class="reset-description">Pause and breathe</div>
-            </div>
-            <div class="reset-icon">⏸️</div>
-          </button>
-
-          <button class="micro-action-button" id="microActionButton">
-            <div class="micro-content">
-              <div class="micro-title">Do 1 Small Action Instead</div>
-              <div class="micro-description" id="microDescription">Build momentum with micro-habits</div>
-            </div>
-            <div class="micro-icon">⚡</div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Footer Message -->
-      <div class="footer-message">
-        <div class="footer-icon">✨</div>
-        <p>Every intentional choice strengthens your focus</p>
-      </div>
-    </div>
-
-    <!-- Donation Banner - ENHANCED -->
-    <div class="donation-banner">
-      <div class="donation-content">
-        <div class="donation-icon">☕</div>
-        <div class="donation-message">
-          <p class="donation-text">
-            <span class="donation-highlight">CleanTab is free and privacy-first.</span><br/>
-            If it helps you focus, consider <a href="https://ko-fi.com/ilyasstoubbali" target="_blank" class="donation-link">buying me a coffee</a>
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Branding -->
-    <div class="branding">
-      <span class="brand-text">Protected by <span class="accent">Clean</span>Tab</span>
-    </div>
+  <!-- Breathing overlay (Take a beat) -->
+  <div class="breathing-overlay" id="breathingOverlay">
+    <div class="breathing-circle" id="breathingCircle"></div>
+    <p class="breathing-label" id="breathingLabel">Breathe in</p>
+    <button class="breathing-skip" id="breathingSkip">Skip</button>
   </div>
 
-  <!-- Countdown Overlay -->
-  <div class="countdown-overlay" id="countdownOverlay">
-    <div class="countdown-content">
-      <div class="countdown-header">
-        <h2>Take a mindful moment</h2>
-        <p>Focus on your breathing</p>
+  <div class="page">
+
+    <header class="page-header">
+      <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" fill="#FF6B35" opacity="0.12"/>
+          <path d="M12 6V12L16 14" stroke="#FF6B35" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span><span class="accent">Clean</span>Tab</span>
       </div>
-      <div class="countdown-circle">
-        <div class="countdown-number" id="countdownNumber">60</div>
+    </header>
+
+    <main class="main">
+
+      <div class="pause-block">
+        <h1 class="pause-heading">Pause.</h1>
+        <p class="reason-text" id="reason-text">This page was flagged.</p>
       </div>
-      <div class="countdown-message">
-        <p>Let yourself reset and refocus</p>
+
+      <div class="divider"></div>
+
+      <!-- Shown only on first ever redirect -->
+      <p class="first-time-note" id="firstTimeNote" style="display:none;">
+        First time here — pick what fits. Only you ever see this.
+      </p>
+
+      <div class="reflection-block">
+        <p class="reflection-question">What's actually going on right now?</p>
+
+        <div class="chips" id="chips">
+          <button class="chip" data-chip="bored">Bored</button>
+          <button class="chip" data-chip="stressed">Stressed</button>
+          <button class="chip" data-chip="habit">Habit</button>
+          <button class="chip" data-chip="avoiding">Avoiding something</button>
+          <button class="chip" data-chip="lonely">Lonely</button>
+          <button class="chip" data-chip="tired">Tired</button>
+        </div>
+
+        <div class="chip-confirm" id="chipConfirm" style="display:none;">
+          <p class="confirm-text" id="confirmText">Logged.</p>
+          <p class="confirm-count" id="confirmCount"></p>
+        </div>
       </div>
-      <button class="countdown-skip" id="countdownSkip">Skip</button>
-    </div>
+
+      <div class="divider"></div>
+
+      <div class="secondary-actions">
+        <button class="secondary-btn" id="breatheBtn">Take a beat</button>
+        <button class="secondary-btn appeal" id="appeal-btn">This was wrongly flagged</button>
+      </div>
+
+      <div class="appeal-status" id="appeal-status"></div>
+
+    </main>
+
   </div>
+
+  <script src="redirect.js"></script>
 </body>
 </html>

@@ -1,0 +1,132 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0f0f0f;
+  color: #e8e8e8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 480px;
+  padding: 48px 32px;
+}
+
+/* Header */
+.header {
+  margin-bottom: 48px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: #e8e8e8;
+}
+
+.accent { color: #FF6B35; }
+
+/* Main content */
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.headline {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.body-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #a0a0a0;
+  max-width: 360px;
+}
+
+.privacy-note {
+  font-size: 13px;
+  color: #606060;
+}
+
+.divider {
+  height: 1px;
+  background: #222;
+  margin: 8px 0;
+}
+
+.question {
+  font-size: 16px;
+  font-weight: 500;
+  color: #d0d0d0;
+  margin-bottom: 4px;
+}
+
+/* Chips */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #a0a0a0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip:hover {
+  border-color: #FF6B35;
+  color: #FF6B35;
+}
+
+.chip.selected {
+  background: #FF6B35;
+  border-color: #FF6B35;
+  color: #fff;
+}
+
+/* Done button */
+.done-btn {
+  margin-top: 8px;
+  padding: 14px 32px;
+  border-radius: 100px;
+  border: none;
+  background: #FF6B35;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.done-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.done-btn:not(:disabled):hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}

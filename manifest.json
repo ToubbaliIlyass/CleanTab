@@ -4,7 +4,7 @@
   "version": "0.1",
   "incognito": "split",
   "description": "Stay intentional online — CleanTab detects NSFW content and redirects you to focus.",
-  "permissions": ["tabs", "storage", "scripting", "activeTab", "alarms", "tabCapture"],
+  "permissions": ["tabs", "storage", "scripting", "activeTab", "alarms", "idle", "offscreen"],
   "host_permissions": ["<all_urls>"],
 
   "background": {
@@ -33,7 +33,11 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["redirect/redirect.html"],
+      "resources": [
+        "redirect/redirect.html",
+        "onboarding/onboarding.html",
+        "vendor/nsfwjs/model/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

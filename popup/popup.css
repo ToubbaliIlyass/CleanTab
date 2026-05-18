@@ -181,8 +181,7 @@ body {
 }
 
 /* Shared card proportions */
-.stat-card,
-.streak-card {
+.stat-card {
   min-height: 120px;
   display: flex;
   flex-direction: column;
@@ -205,74 +204,122 @@ body {
 }
 
 /* ========================= */
-/* Streak Card (Golden) */
+/* Ring Card (Daily)         */
 /* ========================= */
-.streak-card {
-  position: relative;
-  background: linear-gradient(135deg, #fff7cc 0%, #fde68a 40%, #fbbf24 100%);
-  border: 1.5px solid #facc15;
+.ring-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid #e5e5e5;
   border-radius: 16px;
-  padding: 24px 20px;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(250, 204, 21, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
 }
 
-.streak-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(250, 204, 21, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+.ring-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
-.streak-card::before {
-  content: "";
+.ring-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ring-svg {
+  display: block;
+}
+
+.ring-track {
+  fill: none;
+  stroke: #f0f0f0;
+  stroke-width: 10;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: url(#ringGradient);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+}
+
+.ring-center {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    120deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.35) 50%,
-    transparent 100%
-  );
-  opacity: 0.8;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.streak-value {
-  display: block;
-  font-size: 48px;
-  font-weight: 800;
-  line-height: 1;
-  margin-bottom: 10px;
-  color: #78350f;
+.ring-pct {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
   letter-spacing: -0.03em;
 }
 
-.streak-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  color: #92400e;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.ring-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
-.streak-sub {
-  margin-top: 10px;
-  font-size: 12px;
+.ring-label {
+  font-size: 14px;
   font-weight: 600;
-  color: #78350f;
-  opacity: 0.85;
+  color: #1a1a1a;
 }
 
-.streak-icon {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  font-size: 26px;
-  opacity: 0.35;
+.ring-sub {
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+}
+
+/* ========================= */
+/* Cumulative Card (Lifetime) */
+/* ========================= */
+.cumulative-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cumul-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.cumul-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: -0.02em;
+}
+
+.cumul-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cumul-divider {
+  width: 1px;
+  height: 32px;
+  background: #e8e8e8;
 }
 
 .stat-value {
@@ -754,4 +801,128 @@ body {
   color: #a3a3a3;
   margin-top: 10px;
   font-weight: 600;
+}
+
+/* ========================= */
+/* Section label             */
+/* ========================= */
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ========================= */
+/* Heatmap (Phase 7)         */
+/* ========================= */
+.heatmap-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #ebebeb;
+}
+
+.heatmap-grid {
+  display: flex;
+  gap: 3px;
+  flex-wrap: nowrap;
+}
+
+.heatmap-cell {
+  flex: 1;
+  height: 10px;
+  border-radius: 2px;
+  min-width: 6px;
+  cursor: default;
+  transition: opacity 0.15s ease;
+}
+
+.heatmap-cell:hover { opacity: 0.75; }
+
+/* ========================= */
+/* Insights (Phase 9)        */
+/* ========================= */
+.insights-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid #ebebeb;
+}
+
+.trigger-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.trigger-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trigger-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #525252;
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.trigger-track {
+  flex: 1;
+  height: 5px;
+  background: #f0f0f0;
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.trigger-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B35 0%, #f7931e 100%);
+  border-radius: 100px;
+  transition: width 0.4s ease;
+}
+
+.trigger-pct {
+  font-size: 11px;
+  color: #bbb;
+  font-weight: 600;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ========================= */
+/* Export / Import (Phase 11) */
+/* ========================= */
+.data-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #ebebeb;
+}
+
+.data-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: #bbb;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  transition: color 0.15s ease;
+}
+
+.data-btn:hover { color: #737373; }
+
+.data-sep {
+  font-size: 12px;
+  color: #ddd;
 }

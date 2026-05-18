@@ -120,82 +120,52 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  // ---------- Load redirects ----------
-  chrome.storage.local.get(["redirectsToday"], (data) => {
-    const redirectsEl = document.getElementById("redirects");
-    if (redirectsEl) {
-      redirectsEl.textContent = data.redirectsToday ?? 0;
-    }
-  });
+  // ---------- Ring + cumulative display ----------
+  const RING_CIRCUMFERENCE = 301.6; // 2π × r=48
 
-  // ---------- Load streak data ----------
-  const MAX_DAILY_REDIRECTS = 3;
-
-  function updateStreakDisplay() {
+  function updateRingDisplay() {
     chrome.storage.local.get(
-      ["streak", "redirectsToday", "streakBrokenToday"],
-      ({ streak = 1, redirectsToday = 0, streakBrokenToday = false }) => {
-        const streakEl = document.getElementById("streakValue");
-        const streakSub = document.getElementById("streakSub");
-        const streakCard = document.querySelector(".streak-card");
+      ["today", "goalMinutes", "totals"],
+      ({ today = {}, goalMinutes = 120, totals = {} }) => {
+        const cleanMinutes = today.cleanMinutes || 0;
+        const pct = Math.min(1, cleanMinutes / goalMinutes);
 
-        if (!streakEl || !streakSub || !streakCard) return;
-
-        // Ensure streak is valid
-        streak = Math.max(1, streak);
-        streakEl.textContent = streak;
-
-        // Reset to default styles
-        streakCard.style.border = "";
-        streakCard.style.filter = "";
-
-        // Dynamic messaging based on streak length
-        let message;
-        if (streak === 1) {
-          message = "Starting fresh";
-        } else if (streak < 3) {
-          message = "Building consistency";
-        } else if (streak < 7) {
-          message = "Momentum is forming";
-        } else if (streak < 14) {
-          message = "Strong focus habit";
-        } else if (streak < 30) {
-          message = "Exceptional discipline";
-        } else {
-          message = "Master of focus";
+        // Ring arc
+        const fillEl = document.getElementById("ringFill");
+        const pctEl = document.getElementById("ringPct");
+        const subEl = document.getElementById("ringSub");
+        if (fillEl) {
+          const filled = pct * RING_CIRCUMFERENCE;
+          fillEl.setAttribute("stroke-dasharray", `${filled} ${RING_CIRCUMFERENCE}`);
+        }
+        if (pctEl) pctEl.textContent = `${Math.round(pct * 100)}%`;
+        if (subEl) {
+          const remaining = Math.max(0, goalMinutes - cleanMinutes);
+          subEl.textContent = remaining > 0
+            ? `${remaining} min to close the ring`
+            : "Ring closed today";
         }
 
-        // Color intensity based on streak
-        const intensity = Math.min(streak / 20, 1);
-        streakCard.style.filter = `saturate(${1 + intensity * 0.5}) brightness(${1 + intensity * 0.15})`;
+        // Redirects today (from v1 schema)
+        const redirectsEl = document.getElementById("redirects");
+        if (redirectsEl) redirectsEl.textContent = today.redirects ?? 0;
 
-        // Warning states
-        if (streakBrokenToday) {
-          streakSub.textContent = "⚠️ Streak will reset tomorrow";
-          streakCard.style.border = "1px solid rgba(255,107,53,0.6)";
-        } else if (redirectsToday === MAX_DAILY_REDIRECTS) {
-          streakSub.textContent = "⚠️ One more block resets your streak";
-          streakCard.style.border = "1px solid rgba(255,107,53,0.4)";
-        } else if (redirectsToday === MAX_DAILY_REDIRECTS - 1) {
-          streakSub.textContent = `⚠️ ${MAX_DAILY_REDIRECTS - redirectsToday} block left today`;
-          streakCard.style.border = "1px solid rgba(255,165,0,0.4)";
-        } else {
-          streakSub.textContent = message;
-        }
+        // Cumulative
+        const closedEl = document.getElementById("closedDays");
+        const reflEl = document.getElementById("reflectionsTotal");
+        const hrsEl = document.getElementById("lifetimeHours");
+        if (closedEl) closedEl.textContent = totals.closedDays ?? 0;
+        if (reflEl) reflEl.textContent = totals.reflectionsLogged ?? 0;
+        if (hrsEl) hrsEl.textContent = Math.floor((totals.lifetimeCleanMinutes ?? 0) / 60);
       },
     );
   }
 
-  // Initial load
-  updateStreakDisplay();
+  updateRingDisplay();
 
-  // Update display when storage changes
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (
-      area === "local" &&
-      (changes.streak || changes.redirectsToday || changes.streakBrokenToday)
-    ) {
-      updateStreakDisplay();
+    if (area === "local" && (changes.today || changes.totals || changes.goalMinutes)) {
+      updateRingDisplay();
     }
   });
 
@@ -245,10 +215,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (disableTimerInterval) clearInterval(disableTimerInterval);
           syncEnabledUI(true);
 
-          // Show streak, hide timer
-          const streakCard = document.getElementById("streakCard");
+          const ringCard = document.getElementById("ringCard");
           const timerCard = document.getElementById("disableTimerCard");
-          if (streakCard) streakCard.style.display = "block";
+          if (ringCard) ringCard.style.display = "flex";
           if (timerCard) timerCard.style.display = "none";
         });
       });
@@ -398,14 +367,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // Disable timer management
   function startDisableTimer(disableUntil) {
     const timerEl = document.getElementById("disableTimer");
-    const streakCard = document.getElementById("streakCard");
+    const ringCard = document.getElementById("ringCard");
     const timerCard = document.getElementById("disableTimerCard");
 
-    if (!timerEl || !streakCard || !timerCard) return;
+    if (!timerEl || !ringCard || !timerCard) return;
 
-    // Show timer, hide streak
-    streakCard.style.display = "none";
-    timerCard.style.display = "block";
+    // Show timer, hide ring
+    ringCard.style.display = "none";
+    timerCard.style.display = "flex";
 
     if (disableTimerInterval) clearInterval(disableTimerInterval);
 
@@ -419,7 +388,7 @@ document.addEventListener("DOMContentLoaded", () => {
           chrome.storage.local.set({ enabled: true }, () => {
             console.log("CleanTab auto-enabled after timer expired");
             syncEnabledUI(true);
-            streakCard.style.display = "block";
+            ringCard.style.display = "flex";
             timerCard.style.display = "none";
           });
         });
@@ -445,37 +414,165 @@ document.addEventListener("DOMContentLoaded", () => {
     },
   );
 
-  // Debug functionality - add to extension footer
-  const footer = document.querySelector("footer");
-  if (footer) {
-    // Add debug button (hidden by default)
-    const debugBtn = document.createElement("button");
-    debugBtn.textContent = "🔧";
-    debugBtn.style.cssText = `
-      position: absolute; 
-      bottom: 5px; 
-      right: 5px; 
-      background: none; 
-      border: none; 
-      opacity: 0.3; 
-      cursor: pointer;
-      font-size: 12px;
-    `;
-    debugBtn.title = "Debug Tools";
-
-    debugBtn.addEventListener("click", () => {
-      const confirmed = confirm(
-        "Clear all appeal data? This will reset rate limits and appeal history.",
-      );
-      if (confirmed) {
-        chrome.runtime.sendMessage({ action: "clearAppealData" }, () => {
-          alert("Appeal data cleared! Rate limits have been reset.");
-          console.log("✅ Appeal data cleared from popup");
-        });
-      }
-    });
-
-    footer.style.position = "relative";
-    footer.appendChild(debugBtn);
+  // ── Heatmap (Phase 7) ──────────────────────────────────────────────────────
+  function localDateKey() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
+
+  function dateMinusDays(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${day}`;
+  }
+
+  function renderHeatmap(history, goalMinutes, todayData) {
+    const grid = document.getElementById("heatmapGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    const todayKey = localDateKey();
+
+    for (let i = 29; i >= 0; i--) {
+      const key = dateMinusDays(i);
+      let pct = 0;
+      let hasData = false;
+
+      if (key === todayKey && todayData) {
+        pct = Math.min(1, (todayData.cleanMinutes || 0) / (goalMinutes || 120));
+        hasData = true;
+      } else if (history[key]) {
+        const d = history[key];
+        pct = Math.min(1, (d.cleanMinutes || 0) / (d.goalMinutes || goalMinutes || 120));
+        hasData = true;
+      }
+
+      const cell = document.createElement("div");
+      cell.className = "heatmap-cell";
+      cell.title = key;
+
+      if (!hasData) {
+        cell.style.background = "#f0f0f0";
+      } else if (pct >= 1) {
+        cell.style.background = "#FF6B35";
+      } else if (pct >= 0.75) {
+        cell.style.background = "#ffb899";
+      } else if (pct >= 0.5) {
+        cell.style.background = "#ffd4c2";
+      } else if (pct >= 0.25) {
+        cell.style.background = "#ffe8df";
+      } else {
+        cell.style.background = "#f5f5f5";
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  // ── Insights (Phase 9) ─────────────────────────────────────────────────────
+  const CHIP_LABELS = {
+    bored: "Bored", stressed: "Stressed", habit: "Habit",
+    avoiding: "Avoiding", lonely: "Lonely", tired: "Tired",
+  };
+
+  function renderInsights(reflections, totals) {
+    const section = document.getElementById("insightsSection");
+    if (!section) return;
+    if ((totals.reflectionsLogged || 0) < 10) return;
+
+    section.style.display = "flex";
+
+    const counts = {};
+    Object.keys(CHIP_LABELS).forEach((k) => (counts[k] = 0));
+    reflections.forEach((r) => { if (counts[r.chip] !== undefined) counts[r.chip]++; });
+
+    const total = reflections.length || 1;
+    const max = Math.max(...Object.values(counts), 1);
+
+    const barsEl = document.getElementById("triggerBars");
+    barsEl.innerHTML = "";
+
+    Object.entries(counts)
+      .sort(([, a], [, b]) => b - a)
+      .filter(([, count]) => count > 0)
+      .forEach(([chip, count]) => {
+        const pct = Math.round((count / total) * 100);
+        const bar = document.createElement("div");
+        bar.className = "trigger-bar";
+        bar.innerHTML = `
+          <span class="trigger-name">${CHIP_LABELS[chip]}</span>
+          <div class="trigger-track">
+            <div class="trigger-fill" style="width:${(count / max) * 100}%"></div>
+          </div>
+          <span class="trigger-pct">${pct}%</span>
+        `;
+        barsEl.appendChild(bar);
+      });
+  }
+
+  // Load heatmap + insights on open and on storage change
+  function loadSupplementaryData() {
+    chrome.storage.local.get(
+      ["history", "goalMinutes", "today", "totals", "reflections"],
+      ({ history = {}, goalMinutes = 120, today = {}, totals = {}, reflections = [] }) => {
+        renderHeatmap(history, goalMinutes, today);
+        renderInsights(reflections, totals);
+      },
+    );
+  }
+
+  loadSupplementaryData();
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && (changes.history || changes.reflections || changes.today)) {
+      loadSupplementaryData();
+    }
+  });
+
+  // ── Export / Import (Phase 11) ─────────────────────────────────────────────
+  document.getElementById("exportBtn")?.addEventListener("click", () => {
+    chrome.storage.local.get(null, (data) => {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cleantab-backup-${localDateKey()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  });
+
+  document.getElementById("importBtn")?.addEventListener("click", () => {
+    document.getElementById("importFile")?.click();
+  });
+
+  document.getElementById("importFile")?.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.schemaVersion) throw new Error("Invalid backup");
+        chrome.storage.local.set(data, () => {
+          alert("Data restored. Reopen the popup to see your history.");
+        });
+      } catch {
+        alert("Could not read this file. Make sure it is a valid CleanTab backup.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
 });
+
