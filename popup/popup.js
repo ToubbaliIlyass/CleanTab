@@ -176,14 +176,14 @@ document.addEventListener("DOMContentLoaded", () => {
     activePassphrase = PASSPHRASES[Math.floor(Math.random() * PASSPHRASES.length)];
     document.querySelectorAll(".passphrase-box").forEach((el) => { el.textContent = activePassphrase; });
     document.querySelectorAll(".view-passphrase .text-input, .view-reenter .text-input").forEach((el) => { el.value = ""; });
-    document.querySelectorAll(".view-passphrase .btn, .view-reenter .btn").forEach((btn) => {
+    document.querySelectorAll(".view-passphrase .flow-actions .btn:last-child, .view-reenter .flow-actions .btn:last-child").forEach((btn) => {
       btn.disabled = true; btn.classList.add("disabled");
     });
   }
 
   function wirePassphrase(viewSel, onSuccess) {
     const input = document.querySelector(`${viewSel} .text-input`);
-    const btn = document.querySelector(`${viewSel} .btn`);
+    const btn = document.querySelector(`${viewSel} .flow-actions .btn:last-child`);
     if (!input || !btn) return;
     input.addEventListener("input", () => {
       const match = input.value.trim() === activePassphrase;
