@@ -1,22 +1,27 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --cream:    #F5F2ED;
-  --cream-2:  #EBE8E2;
-  --ink:      #1A1815;
-  --ink-2:    #6B6760;
-  --ink-3:    #B8B5B0;
+  --bg:       #FFFFFF;
+  --s1:       #F8F6F2;
+  --s2:       #F0EDE7;
+  --border:   #E4E0D8;
+  --text:     #1C1915;
+  --text2:    #78736C;
+  --text3:    #B5AFA7;
   --accent:   #FF6B35;
-  --border:   #E0DDD8;
-  --ff-serif: 'Instrument Serif', Georgia, serif;
-  --ff-sans:  'DM Sans', system-ui, sans-serif;
+  --abg:      rgba(255,107,53,.08);
+  --aborder:  rgba(255,107,53,.2);
+  --ok:       #16A34A;
+  --warn:     #DC2626;
+  --ff-d:     'Bricolage Grotesque', system-ui, sans-serif;
+  --ff-b:     'DM Sans', system-ui, sans-serif;
 }
 
 html, body {
   height: 100%;
-  background: var(--cream);
-  color: var(--ink);
-  font-family: var(--ff-sans);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ff-b);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
@@ -26,7 +31,7 @@ html, body {
   display: none;
   position: fixed;
   inset: 0;
-  background: var(--cream);
+  background: var(--bg);
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -52,24 +57,25 @@ html, body {
 @keyframes orb-out  { from { transform: scale(2); opacity: 0.5; } to { transform: scale(1); opacity: 0.25; } }
 
 .breath-word {
-  font-family: var(--ff-serif);
+  font-family: var(--ff-d);
   font-size: 20px;
-  color: var(--ink-2);
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text2);
 }
 
 .breath-skip {
   background: none;
   border: none;
   font-size: 12px;
-  color: var(--ink-3);
+  color: var(--text3);
   cursor: pointer;
-  font-family: var(--ff-sans);
+  font-family: var(--ff-b);
   padding: 4px 8px;
   border-radius: 4px;
   transition: color 0.15s;
 }
-.breath-skip:hover { color: var(--ink-2); }
+.breath-skip:hover { color: var(--text2); }
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 .page {
@@ -80,16 +86,17 @@ html, body {
 
 /* ── Nav ──────────────────────────────────────────────────────────── */
 .topbar {
-  padding: 24px 40px;
+  padding: 20px 40px;
   border-bottom: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .wordmark {
-  font-family: var(--ff-sans);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  letter-spacing: -0.2px;
+  font-family: var(--ff-d);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
 }
 .wm-accent { color: var(--accent); }
 
@@ -100,7 +107,7 @@ html, body {
   flex-direction: column;
   max-width: 520px;
   margin: 0 auto;
-  padding: 56px 40px 40px;
+  padding: 52px 40px 40px;
   width: 100%;
   gap: 0;
 }
@@ -109,19 +116,18 @@ html, body {
 .copy { margin-bottom: 32px; }
 
 .pause {
-  font-family: var(--ff-serif);
-  font-size: 80px;
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -2px;
-  line-height: 0.9;
-  color: var(--ink);
-  margin-bottom: 16px;
+  font-family: var(--ff-d);
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: -2.5px;
+  line-height: 0.95;
+  color: var(--text);
+  margin-bottom: 14px;
 }
 
 .reason {
-  font-size: 14px;
-  color: var(--ink-3);
+  font-size: 13px;
+  color: var(--text3);
   line-height: 1.55;
   letter-spacing: 0.01em;
 }
@@ -134,19 +140,22 @@ html, body {
 }
 
 /* ── Reflection ───────────────────────────────────────────────────── */
-.reflect { display: flex; flex-direction: column; gap: 18px; }
+.reflect { display: flex; flex-direction: column; gap: 16px; }
 
 .first-note {
   font-size: 12px;
-  color: var(--ink-3);
+  color: var(--text3);
   font-style: italic;
 }
 
 .reflect-q {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
   letter-spacing: -0.1px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
 }
 
 /* ── Chips ────────────────────────────────────────────────────────── */
@@ -160,20 +169,15 @@ html, body {
   padding: 9px 18px;
   border-radius: 100px;
   border: 1.5px solid var(--border);
-  background: white;
-  color: var(--ink-2);
+  background: var(--s1);
+  color: var(--text2);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  font-family: var(--ff-sans);
+  font-family: var(--ff-b);
   transition: all 0.15s ease;
 }
-
-.chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--abg); }
 .chip.selected {
   background: var(--accent);
   border-color: var(--accent);
@@ -189,7 +193,6 @@ html, body {
   color: var(--accent);
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.01em;
   animation: fade-up 0.25s ease;
 }
 
@@ -197,6 +200,39 @@ html, body {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Nudge card ───────────────────────────────────────────────────── */
+.nudge-card {
+  padding: 14px 16px;
+  background: var(--s1);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fade-up 0.3s ease;
+}
+
+.nudge-text {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.nudge-breathe {
+  align-self: flex-start;
+  padding: 9px 18px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--ff-b);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nudge-breathe:hover { background: #e85a24; }
 
 /* ── Secondary actions ────────────────────────────────────────────── */
 .secondary {
@@ -208,70 +244,29 @@ html, body {
 .sec-btn {
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--ink-3);
+  color: var(--text3);
   cursor: pointer;
-  font-family: var(--ff-sans);
+  font-family: var(--ff-b);
   padding: 0;
   transition: color 0.15s;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: transparent;
 }
-.sec-btn:hover {
-  color: var(--ink-2);
-  text-decoration-color: var(--border);
-}
-.sec-btn.appeal { }
+.sec-btn:hover { color: var(--text2); }
 
 .sec-sep {
-  font-size: 13px;
-  color: var(--ink-3);
+  font-size: 12px;
+  color: var(--text3);
   line-height: 1;
 }
-
-/* ── Nudge card ───────────────────────────────────────────────────── */
-.nudge-card {
-  padding: 4px 0 4px 16px;
-  border-left: 2px solid var(--accent);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: fade-up 0.3s ease;
-}
-
-.nudge-text {
-  font-family: var(--ff-serif);
-  font-style: italic;
-  font-size: 16px;
-  color: var(--ink-2);
-  line-height: 1.5;
-}
-
-.nudge-breathe {
-  align-self: flex-start;
-  padding: 9px 20px;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 100px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: var(--ff-sans);
-  cursor: pointer;
-  transition: background 0.15s;
-  letter-spacing: -0.1px;
-}
-.nudge-breathe:hover { background: #e85a24; }
 
 /* ── Appeal result ────────────────────────────────────────────────── */
 .appeal-result {
   margin-top: 14px;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--ink-2);
+  color: var(--text2);
 }
 .appeal-result:empty { display: none; }
-.appeal-result.ok    { color: #16a34a; }
-.appeal-result.err   { color: #dc2626; }
+.appeal-result.ok  { color: var(--ok); }
+.appeal-result.err { color: var(--warn); }
