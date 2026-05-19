@@ -394,7 +394,7 @@ CleanTab/
 - TypeScript migration (worth doing eventually, but not blocking).
 - Tests / CI (worth adding before Phase 8 to lock down the storage layer, but not in scope of the visible work).
 
----
+---in
 
 ## 7. Post-redesign cleanup (queued 2026-05-19)
 
@@ -516,59 +516,3 @@ Outside this list, dwell scanning is off. Cheap text scoring stays as the global
 
 ### 8.8 Execution
 This is a meaningful feature — separate phase, separate commit, possibly a feature flag (`enableDwellDetection` in storage, default off until tuned). Land behind the flag, dogfood on Pinterest for a week, then default on.
-
----
-
-## 9. Contextual nudges on the redirect page (Phase 9 — queued 2026-05-19)
-
-### 9.1 Why
-Today's redirect page asks "what's underneath this urge?" via chips. That's the high-leverage interrupt — naming the feeling. But once the user has tapped a chip, the page falls silent. They get a small `.logged` confirmation and that's it. The user wants one more thing: a *reminder of why they installed this*, surfaced contextually based on what they just admitted to feeling.
-
-The constraint that matters: this cannot feel parental. The extension is not telling them what to do; it's reflecting back one concrete fact from data they generated, then offering one related action. One thing per chip, not a menu.
-
-### 9.2 Design rules
-- **One nudge per chip.** Not three suggestions. Not a checklist.
-- **Pulled from data the extension already has** wherever possible. No new tracking, no new permissions.
-- **Tone: observation, not instruction.** "Your ring is at 65%" beats "You should close your ring."
-- **Appears after the chip is tapped**, alongside the existing `.logged` confirmation — not before. Reflection comes first, then the soft handoff.
-- **Skippable.** The nudge is informational; the user can close the tab without engaging with it.
-
-### 9.3 Chip → nudge mapping
-
-| Chip | Nudge copy | Data source | Optional CTA |
-|---|---|---|---|
-| **Bored** | "Your ring is at {pct}% — {remaining} min to close today." | `today.cleanMinutes` / `goalMinutes` | none |
-| **Stressed** | (UI shift only) Promote the existing "Take a beat" breathing button to primary CTA, larger, with focused styling. | none | "Take a beat" (breathing overlay) |
-| **Habit** | "This is your {n}{ordinal} pause today." | `today.redirects` | none |
-| **Tired** | After 21:00 local: "It's getting late — your body's tired. Worth closing the laptop?" Before 21:00: "Your body's giving a signal. Step away for 10 min." | `new Date().getHours()` | none |
-| **Avoiding** | "You've closed your ring on {totals.closedDays} days. Today's still open." | `totals.closedDays` + today's progress | none |
-| **Lonely** | "Loneliness often fuels the scroll. A quick message to someone real lands deeper." | none (one-liner observation) | none |
-
-**Edge cases:**
-- First-day install: `closedDays = 0`, `redirects = 0`. The Avoiding nudge becomes "Today is day one. The first ring is the hardest." Habit nudge says "First pause today."
-- Goal already closed (`cleanMinutes >= goalMinutes`): Bored nudge becomes "Your ring is closed for today. The work is done."
-- After-midnight ambiguity: the Tired branch uses local hours; treat 0:00–4:00 as still "late."
-
-### 9.4 Honest concerns
-- **Lonely is the weakest entry** — no data to anchor it. The fallback line is a generic cognitive observation. Alternative considered: skip the nudge entirely on Lonely and keep just the chip confirmation. Going with the one-liner because zero feedback on one chip while others get a contextual nudge feels uneven. Revisit after dogfood.
-- **Avoiding** could go in two directions: "you've done this before" (chosen, draws on `closedDays`) vs. "whatever you're avoiding will still be there — start with one small piece." The first is observational, the second is prescriptive. Chose observational to stay consistent with the rest of the page's tone.
-- **Habit nudge can sting.** Pulling the literal redirect count surfaces the loop the user is in. That's the point — but it has to land as honest, not punishing. Copy is "{n}th pause" not "{n} relapses." Worth A/B testing tone later.
-- **Tired's time branch is a heuristic, not a real fatigue signal.** A user up at 23:00 is not necessarily tired; a user who napped at 14:00 might be. Acceptable: the chip is the user's self-report; we're amplifying their own signal, not making the diagnosis.
-
-### 9.5 Files this will touch
-- `redirect/redirect.html` — add a `.nudge-card` element below the chip confirmation, hidden by default.
-- `redirect/redirect.css` — style for `.nudge-card` (paper background, small section-label header, body copy). Promoted breathing button variant for Stressed.
-- `redirect/redirect.js` — on chip tap, read `today` / `totals` / `goalMinutes` from storage, build the nudge for the tapped chip, render into `.nudge-card`. For Stressed, swap the breathing button into the primary position.
-
-### 9.6 Acceptance criteria
-- Tapping any chip shows a nudge below the logged confirmation within ~200ms.
-- Each chip produces the correct copy with the correct interpolated numbers.
-- Stressed reorganizes the page so the breathing button is the most visually weighted CTA, not just a small link.
-- Closing the tab is always possible without touching the nudge.
-- A user who has never installed the extension before (zero data) sees the first-day fallback copy, not "NaN%" or "undefined min."
-
-### 9.7 Out of scope for v1
-- No multi-step nudge flows.
-- No nudge personalization beyond the chip + raw counters.
-- No "remind me later" or scheduled re-nudges.
-- No tracking of whether the nudge changed user behavior (could be added in Phase 10 if pattern data accumulates).
