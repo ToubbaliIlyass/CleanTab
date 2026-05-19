@@ -127,6 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (cooldownUntil && cooldownUntil > Date.now()) {
         showView("view-cooldown"); startCooldownTimer(cooldownUntil);
       } else {
+        assignNewPassphrase();
         showView("view-passphrase");
       }
     });
@@ -157,17 +158,35 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ── Passphrase wiring ─────────────────────────────────────────────────────
-  // Friction, not security — visible in source by design
-  const PASSPHRASE = "I choose long-term focus over short-term impulse.";
+  // Friction, not security — pool is visible in source by design
+  const PASSPHRASES = [
+    "I choose long-term focus over short-term impulse.",
+    "The discomfort I feel now is smaller than the regret I'd feel later.",
+    "Discipline is choosing what I want most over what I want right now.",
+    "I am in control of where my attention goes.",
+    "This moment of resistance is building something real.",
+    "I respect my own time and energy.",
+    "What I do right now shapes who I become.",
+    "The urge will pass. My focus stays.",
+  ];
+
+  let activePassphrase = PASSPHRASES[0];
+
+  function assignNewPassphrase() {
+    activePassphrase = PASSPHRASES[Math.floor(Math.random() * PASSPHRASES.length)];
+    document.querySelectorAll(".passphrase-box").forEach((el) => { el.textContent = activePassphrase; });
+    document.querySelectorAll(".view-passphrase .text-input, .view-reenter .text-input").forEach((el) => { el.value = ""; });
+    document.querySelectorAll(".view-passphrase .btn, .view-reenter .btn").forEach((btn) => {
+      btn.disabled = true; btn.classList.add("disabled");
+    });
+  }
 
   function wirePassphrase(viewSel, onSuccess) {
     const input = document.querySelector(`${viewSel} .text-input`);
     const btn = document.querySelector(`${viewSel} .btn`);
     if (!input || !btn) return;
-    btn.disabled = true;
-    btn.classList.add("disabled");
     input.addEventListener("input", () => {
-      const match = input.value.trim() === PASSPHRASE;
+      const match = input.value.trim() === activePassphrase;
       btn.disabled = !match;
       btn.classList.toggle("disabled", !match);
     });
@@ -177,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   wirePassphrase(".view-passphrase", () => {
-    const until = Date.now() + 10 * 1000;
+    const until = Date.now() + 60 * 60 * 1000; // 1-hour cooldown
     chrome.storage.local.set({ cooldownUntil: until }, () => {
       showView("view-cooldown");
       startCooldownTimer(until);
