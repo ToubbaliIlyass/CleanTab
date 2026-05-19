@@ -228,6 +228,40 @@ html, body {
   line-height: 1;
 }
 
+/* ── Nudge card ───────────────────────────────────────────────────── */
+.nudge-card {
+  padding: 14px 16px;
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fade-up 0.3s ease;
+}
+
+.nudge-text {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.nudge-breathe {
+  align-self: flex-start;
+  padding: 9px 20px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--ff-sans);
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: -0.1px;
+}
+.nudge-breathe:hover { background: #e85a24; }
+
 /* ── Appeal result ────────────────────────────────────────────────── */
 .appeal-result {
   margin-top: 14px;
