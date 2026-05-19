@@ -393,3 +393,126 @@ CleanTab/
 - Image classification on every page (only on ambiguous band + appeals — performance cost not worth it elsewhere).
 - TypeScript migration (worth doing eventually, but not blocking).
 - Tests / CI (worth adding before Phase 8 to lock down the storage layer, but not in scope of the visible work).
+
+---
+
+## 7. Post-redesign cleanup (queued 2026-05-19)
+
+Issues surfaced during review of the light-mode popup + ring + guard pass. Ordered by impact.
+
+### 7.1 Heatmap legend mismatch (visible bug)
+- **Where:** `popup/popup.html:97-103`
+- **Problem:** Legend swatches still use the old dark-mode hex stack (`#1E1E1E → #FF6B35`) while `popup/popup.js:290-295` now paints cells with the cream/orange light-mode stack (`#F0EDE7 → #FF6B35`).
+- **Fix:** Update legend swatches to `#F0EDE7, #FFE9DB, #FFD0B5, #FFAA7A, #FF6B35` so "Less → More" actually matches the grid.
+- **Acceptance:** Visual diff of legend cells matches the lowest five tiers in the grid renderer.
+
+### 7.2 Onboarding still dark-themed
+- **Where:** `onboarding/onboarding.css` (`--bg: #0B0B0B`, full dark palette)
+- **Problem:** First-run experience is dark; popup is light. Jarring brand inconsistency on the very first impression.
+- **Fix:** Repaint onboarding to the popup's light palette (`--bg: #FFFFFF`, `--s1: #F8F6F2`, `--text: #1C1915`, etc.). Keep Bricolage headline + DM Sans body + orange accent. Re-check goal-preview contrast and `.chip` selected state on the new background.
+- **Acceptance:** Open onboarding side-by-side with the popup; same paper-cream feel, no dark surfaces.
+
+### 7.3 Insights dual source of truth
+- **Where:** `popup/popup.js:304-340` (`renderInsights`)
+- **Problem:** Gate uses `totals.reflectionsLogged`; bar counts come from iterating `reflections[]`. If the two drift (import, manual edit, future bug), the gate opens but the bars are empty — or vice versa.
+- **Fix:** Pick one source. Recommended: derive both from `reflections.length` (gate + counts), and treat `totals.reflectionsLogged` as a denormalized convenience only.
+- **Acceptance:** Manually setting `totals.reflectionsLogged` out of sync with `reflections[]` does not break the panel.
+
+### 7.4 Detection regex test harness
+- **Where:** new `tests/` directory (no infra exists yet)
+- **Problem:** `getKeywordScore` and `PASSTHROUGH_PARAMS` are the most regression-prone code in the project; any future keyword tweak could silently re-introduce the Google-login false positive.
+- **Fix:** Add a minimal Node-runnable test file (no framework — `node --test` is fine) that exercises:
+  - known false-positive corpus (Google login URL, "Essex" prose, "camera shop" page text) — must score 0 or below threshold
+  - known true-positive corpus (a handful of unambiguous adult domain/keyword combos) — must score above threshold
+  - passthrough-param behavior on `continue=`, `redirect_uri=`, `next=`
+- **Acceptance:** `node --test tests/detection.test.js` passes locally; add a one-line note to README on how to run it.
+
+### 7.5 Passphrase honesty note
+- **Where:** `popup/popup.js:160` (hardcoded `PASSPHRASE`)
+- **Problem:** The string is plainly visible in source — anyone reading the code can bypass it. That's fine *if* the goal is friction, not secrecy, but it's not documented.
+- **Fix:** One-line comment at the constant clarifying intent ("friction, not security — visible in source by design"). No behavioral change.
+- **Acceptance:** Comment present; no functional change.
+
+### 7.6 (Optional, deferrable) NSFW.js bundle in git
+- **Where:** `vendor/nsfwjs/nsfwjs.min.js` (2.7MB tracked)
+- **Problem:** Inflates clone size; every model update is a 2.7MB commit.
+- **Fix candidates:**
+  - Keep as-is (current; simplest, zero-network install).
+  - Move to a `postinstall` script that curls the bundle from a pinned release URL into `vendor/` (smaller repo, requires network on install).
+- **Recommendation:** Defer until the bundle changes for the first time. Re-evaluate then.
+
+### Execution order
+Land 7.1 + 7.2 + 7.3 + 7.5 in a single commit (UI polish + safety). 7.4 as its own commit (introduces test infra). 7.6 stays parked until there's a reason to touch the vendor bundle.
+
+---
+
+## 8. Visual-first detection + intention-aware dwell (Phase 8 — queued 2026-05-19)
+
+### 8.1 The gap we're closing
+Today's detection is **text-only**. The page's DOM text + URL + titles drive every redirect; NSFW.js exists only as a false-positive-reducer on appeal (`background.js:392`). That leaves a real blind spot on image-first platforms — Pinterest, Reddit image subs, Twitter/IG feeds, Tumblr, image search — where a sanitized text shell can wrap visually suggestive imagery. Pinterest is the cleanest example: `pinterest.com/pin/123` has near-zero text signal, isn't in `knownAdultDomains`, and doesn't match `isInsidePost`'s `/p/` or `/post/` patterns (`content.js:139-153`). Result: nothing fires.
+
+We also have the opposite problem in feeds: even if we *did* scan images, a fast scroll past a borderline image isn't the same as stopping on it. The user's intention is the signal we actually care about.
+
+### 8.2 Design rationale: dwell as the signal
+A redirect is a heavy interruption. Firing it on every flagged image that scrolls through the viewport would be:
+- **High false-positive rate** — feeds mix everything; one borderline thumbnail among 30 is noise, not intent.
+- **Demoralizing** — punishes scrolling, not engagement.
+- **Misaligned with the ring model** — the whole product premise is that *the user is steering*, not that we're flagging every pixel.
+
+Dwell (≥2s in viewport, page not scrolling) is a behavioral proxy for "I stopped because this caught my eye." That maps to the moment a user would actually benefit from a redirect. Scroll-past gets ignored; lingering gets classified.
+
+### 8.3 Architecture
+
+**Two new pieces in the content script:**
+1. **Dwell observer** — `IntersectionObserver` on `<img>` elements above a size threshold (e.g., ≥ 180×180 px to skip avatars/icons). When an image enters ≥50% visibility AND the page is not actively scrolling, start a 2000ms timer. On scroll, blur, or visibility exit, cancel. On timer fire, mark the image as "dwelled" and request classification.
+2. **Classification request** — Send `{action: "classifyImage", src: <img.src>, tabId}` to background. Throttle: max one in-flight + one queued per tab; min 3s between classifications per tab.
+
+**Background extension:**
+- New handler `classifyImage` → `fetch(src)` (cross-origin works because we have `<all_urls>` host permission) → blob → send to offscreen doc → NSFW.js classifies the blob, not a tab screenshot.
+- `offscreen/offscreen.js` already has `nsfwjs.load()`; add a `classifyBlob` message handler alongside the existing `classifyScreenshot`.
+
+**Decision logic:**
+- Reuse existing `isLikelyUnsafe(prediction)` (`background.js:134`).
+- If unsafe: send `{action: "redirect", reason: "Image dwell on flagged content"}` to the content script of that tab.
+- If safe: silently mark the image as "cleared" in a WeakSet so we never re-classify it within the page lifetime.
+
+**Platform allowlist for dwell scanning** (start narrow, expand on data):
+- pinterest.com (all pages)
+- reddit.com (subreddit + post pages)
+- twitter.com / x.com (home + explore)
+- instagram.com (explore + reels)
+- tumblr.com
+- google.com/search?tbm=isch (image search)
+
+Outside this list, dwell scanning is off. Cheap text scoring stays as the global default. This avoids burning a 200–500ms TF.js inference on every Wikipedia hero image.
+
+### 8.4 Open questions to resolve during build
+1. **Dwell duration** — 2s is the user's number. Tune against real usage; probably 1.5–3s window. Should be a constant, not magic.
+2. **What counts as "scrolling stopped"** — `scrollend` event (newer browsers) or a 250ms quiet period after the last `scroll` event. Latter is more compatible.
+3. **Cross-origin image fetch failures** — some CDNs block direct fetch. Fallback: ask the content script to draw the `<img>` to an `OffscreenCanvas` and ship the resulting blob. Slower path; only needed when fetch fails.
+4. **Per-tab rate limit** — protects against a feed where 10 images all clear the dwell threshold within seconds. Likely 1 classification per 3s, queue depth 1.
+5. **Replays after redirect dismissal** — if the user appeals successfully on a dwelled image, the page should not immediately re-flag the same image. WeakSet of "cleared this lifetime" per tab.
+6. **Battery / CPU on laptops** — TF.js inference is non-trivial. Need to confirm we're not destroying battery on a Pinterest browse session. Possible mitigation: skip dwell scanning when `navigator.getBattery()` reports discharging + low.
+
+### 8.5 Risks honestly
+- **NSFW.js model is general-purpose, not state-of-the-art.** Borderline cases (lingerie ads, art, swimwear) will misfire in both directions. We'll need the existing appeal flow to remain easy.
+- **Image fetch latency** can stretch dwell-to-redirect to 1–3s on slow networks — the redirect arrives after the user has *already* moved on. Acceptable; non-blocking is more important than instant.
+- **Adds CPU work to every page in the allowlist.** Even idle, the IntersectionObserver costs. The platform allowlist contains this.
+- **Could feel surveillance-y if poorly tuned.** A redirect 2s after pausing on an art piece is a worse UX than no redirect at all. Bias toward higher thresholds early; loosen if users report misses.
+
+### 8.6 Acceptance criteria
+- Pinterest pin page with overtly NSFW imagery → user lingers 2s → redirect fires with the dwell reason string.
+- Pinterest feed scroll-through (no lingering) → no redirect, no classifications kicked off.
+- Wikipedia article with a swimwear photo → no classification kicked off (not in allowlist) → no redirect.
+- A clean Pinterest pin lingered on for 5s → classification runs once, returns safe, never re-runs for that image.
+- Battery impact measurable: ≤ 5% additional CPU averaged over a 10-minute Pinterest browse vs. extension disabled (rough; document the measurement, don't gate on it).
+
+### 8.7 Files this will touch (estimated)
+- `content.js` — new `DwellObserver` module + scroll-state tracker + message sender.
+- `background.js` — new `classifyImage` handler + per-tab rate limiter + blob → offscreen pipe.
+- `offscreen/offscreen.js` — add `classifyBlob` handler.
+- `manifest.json` — already has `<all_urls>`; no new perms expected.
+- New constants: `VISUAL_PLATFORMS`, `DWELL_MS`, `MIN_IMAGE_SIZE`, `CLASSIFY_RATE_MS`. Group in `shared/keywords.js` or a new `shared/visual.js`.
+
+### 8.8 Execution
+This is a meaningful feature — separate phase, separate commit, possibly a feature flag (`enableDwellDetection` in storage, default off until tuned). Land behind the flag, dogfood on Pinterest for a week, then default on.

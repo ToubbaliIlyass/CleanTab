@@ -361,6 +361,46 @@ async function tickCleanMinute() {
   });
 }
 
+// Fetches an image URL, converts to dataUrl, classifies via offscreen NSFW.js.
+async function classifyImageUrl(src) {
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    // Convert to base64 in chunks to avoid call stack overflow on large images
+    let binary = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    const mimeType = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
+    const dataUrl = `data:${mimeType};base64,${btoa(binary)}`;
+
+    await ensureOffscreenDoc();
+
+    return await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "classifyBlob", dataUrl }, (r) => {
+        if (chrome.runtime.lastError || !r?.ok) resolve(null);
+        else resolve(r.result);
+      });
+    });
+  } catch (e) {
+    console.error("classifyImageUrl error:", e);
+    return null;
+  }
+}
+
+// Dwell-based image classification request from content script
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.action !== "classifyImage") return false;
+  (async () => {
+    const prediction = await classifyImageUrl(msg.src);
+    sendResponse({ unsafe: isLikelyUnsafe(prediction) });
+  })();
+  return true;
+});
+
 // Appeal handler — uses NSFW.js classifier when model files are present,
 // falls back to keyword score for blocked domains otherwise.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

@@ -31,11 +31,11 @@ async function classify(dataUrl) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action !== "classifyScreenshot") return false;
+  if (msg.action !== "classifyScreenshot" && msg.action !== "classifyBlob") return false;
 
   classify(msg.dataUrl)
     .then((result) => sendResponse({ ok: true, result }))
     .catch((err) => sendResponse({ ok: false, error: err.message }));
 
-  return true; // async
+  return true;
 });

@@ -398,3 +398,116 @@ function debouncedScan() {
   clearTimeout(scanTimeout);
   scanTimeout = setTimeout(scan, 300);
 }
+
+// ── Dwell-based image detection (visual platforms only) ───────────────────────
+
+const VISUAL_PLATFORMS = new Set([
+  "pinterest.com", "www.pinterest.com",
+  "reddit.com", "www.reddit.com", "old.reddit.com",
+  "twitter.com", "www.twitter.com", "x.com", "www.x.com",
+  "instagram.com", "www.instagram.com",
+  "tumblr.com", "www.tumblr.com",
+]);
+
+const DWELL_MS = 2000;       // pause duration before classifying
+const MIN_IMAGE_PX = 180;    // skip avatars and icons
+const CLASSIFY_RATE_MS = 3000; // min gap between classifications per tab
+
+let isPageScrolling = false;
+let scrollStopTimeout;
+window.addEventListener("scroll", () => {
+  isPageScrolling = true;
+  clearTimeout(scrollStopTimeout);
+  scrollStopTimeout = setTimeout(() => { isPageScrolling = false; }, 250);
+}, { passive: true });
+
+let dwellClassifyInFlight = false;
+let dwellClassifyQueued = null;
+let dwellLastClassifyTime = 0;
+
+function dispatchImageClassification(src) {
+  dwellClassifyInFlight = true;
+  dwellLastClassifyTime = Date.now();
+
+  chrome.runtime.sendMessage({ action: "classifyImage", src }, (response) => {
+    dwellClassifyInFlight = false;
+    if (chrome.runtime.lastError) return;
+    if (response?.unsafe && extensionEnabled && !redirectTriggered) {
+      redirectTriggered = true;
+      chrome.runtime.sendMessage({ action: "redirect", reason: "Dwelled on flagged image content" });
+      setTimeout(resetRedirectProtection, 1500);
+    }
+    // Drain one queued item after rate-limit delay
+    if (dwellClassifyQueued) {
+      const nextSrc = dwellClassifyQueued;
+      dwellClassifyQueued = null;
+      const delay = Math.max(0, CLASSIFY_RATE_MS - (Date.now() - dwellLastClassifyTime));
+      setTimeout(() => dispatchImageClassification(nextSrc), delay);
+    }
+  });
+}
+
+function requestImageClassification(src) {
+  if (!src || src.startsWith("data:") || src.startsWith("blob:")) return;
+  const now = Date.now();
+  if (dwellClassifyInFlight || (now - dwellLastClassifyTime) < CLASSIFY_RATE_MS) {
+    dwellClassifyQueued = src; // keep only the latest
+    return;
+  }
+  dispatchImageClassification(src);
+}
+
+function startDwellObserver() {
+  if (!VISUAL_PLATFORMS.has(location.hostname)) return;
+
+  const dwellTimers = new WeakMap();
+  const clearedImages = new WeakSet();
+
+  const intersectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const img = entry.target;
+      if (clearedImages.has(img)) return;
+
+      if (entry.isIntersecting) {
+        const tid = setTimeout(() => {
+          // Only fire if user is still — not mid-scroll
+          if (!isPageScrolling && !redirectTriggered && extensionEnabled && img.src) {
+            clearedImages.add(img); // mark so we don't re-queue it
+            requestImageClassification(img.src);
+          }
+        }, DWELL_MS);
+        dwellTimers.set(img, tid);
+      } else {
+        const tid = dwellTimers.get(img);
+        if (tid) { clearTimeout(tid); dwellTimers.delete(img); }
+      }
+    });
+  }, { threshold: 0.5 });
+
+  function observeImages() {
+    document.querySelectorAll("img").forEach((img) => {
+      if (dwellTimers.has(img) || clearedImages.has(img)) return;
+      const check = () => {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        if (w >= MIN_IMAGE_PX || h >= MIN_IMAGE_PX) {
+          intersectionObserver.observe(img);
+        }
+      };
+      if (img.complete) check();
+      else img.addEventListener("load", check, { once: true });
+    });
+  }
+
+  observeImages();
+
+  // Pick up images added by infinite-scroll feeds
+  const mutationObserver = new MutationObserver(observeImages);
+  mutationObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startDwellObserver);
+} else {
+  startDwellObserver();
+}

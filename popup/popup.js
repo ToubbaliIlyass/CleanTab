@@ -157,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ── Passphrase wiring ─────────────────────────────────────────────────────
+  // Friction, not security — visible in source by design
   const PASSPHRASE = "I choose long-term focus over short-term impulse.";
 
   function wirePassphrase(viewSel, onSuccess) {
@@ -307,7 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const bars = document.getElementById("triggerBars");
     if (!section || !bars) return;
 
-    if ((totals.reflectionsLogged || 0) < 10) {
+    if (reflections.length < 10) {
       section.style.display = "none";
       if (emptyEl) emptyEl.style.display = "";
       return;

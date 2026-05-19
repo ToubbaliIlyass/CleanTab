@@ -1,15 +1,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:     #0B0B0B;
-  --s1:     #141414;
-  --s2:     #1C1C1C;
-  --border: #272727;
-  --text:   #EAE6E0;
-  --text2:  #6E6E6E;
-  --text3:  #333;
+  --bg:     #FFFFFF;
+  --s1:     #F8F6F2;
+  --s2:     #F0EDE7;
+  --border: #E4E0D8;
+  --text:   #1C1915;
+  --text2:  #78736C;
+  --text3:  #B5AFA7;
   --accent: #FF6B35;
-  --abg:    rgba(255,107,53,.1);
+  --abg:    rgba(255,107,53,.08);
   --ff-d:   'Bricolage Grotesque', system-ui, sans-serif;
   --ff-b:   'DM Sans', system-ui, sans-serif;
 }
@@ -40,6 +40,7 @@ html, body {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.3px;
+  color: var(--text);
 }
 .accent { color: var(--accent); }
 
@@ -114,7 +115,7 @@ html, body {
 .chip {
   padding: 11px 22px;
   border-radius: 100px;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   background: var(--s1);
   color: var(--text2);
   font-size: 14px;
@@ -123,7 +124,7 @@ html, body {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--abg); }
 .chip.selected {
   background: var(--accent);
   border-color: var(--accent);
@@ -138,7 +139,7 @@ html, body {
   gap: 10px;
   padding: 14px 18px;
   background: var(--s1);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   transition: opacity 0.3s ease;
 }
