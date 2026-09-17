@@ -8,6 +8,14 @@
 ## Positioning
 
 **One-line pitch**
+> Hard to remove. Kind when it catches you.
+
+**Positioning decided 2026-09-17.** Lock strength and voice are independent axes. "Reflect,
+don't restrict" is a claim about *tone*, not about being easy to switch off — the earlier
+phrasing read as "we don't really block," which was never the intent. The lock is strong
+*so that* the voice can be gentle.
+
+**Previous one-liner** (kept for reference, no longer the lead)
 > A focus extension that reflects with you, not blocks you out.
 
 **Deeper pitch**
@@ -78,7 +86,8 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
 - **URL parameter awareness** — passthrough params like `continue=`, `redirect_uri=`, `next=` are skipped, so Google logins don't get caught by their own redirect chain.
 - **Known-domain hard block** — a curated list of adult-site domains is denied without further analysis.
 - **Image classification via NSFW.js** — TensorFlow.js + MobileNetV2 running locally in an offscreen document. No network call for inference.
-- **Dwell-based image detection** — on Pinterest, Reddit, Twitter/X, Instagram, and Tumblr, the extension watches for images you *linger on* — not every image that scrolls by. If you pause on something for 2 seconds, that image gets classified.
+- **Dwell-based image detection** — on *any* site, the extension watches for images you *linger on* — not every image that scrolls by. If you pause on something for 2 seconds, that image gets classified. Image-first platforms (Pinterest, Reddit, X, Instagram, Tumblr, imgur…) use a 180px size floor; everywhere else it is 260px, since images that small are usually chrome and avatars.
+- **Page-shape awareness** — text and title scoring run on every page shape *except* an aggregated home feed (`reddit.com/`, `r/popular`, `r/all`, `x.com/home`, `instagram.com/`), where the content was chosen by a recommender rather than by the user. A specific subreddit, a category page or a tag archive is a chosen destination and is scored in full.
 - **Per-tab rate limiting** — max one in-flight classification, 3-second minimum gap, prevents battery drain in heavy feeds.
 - **Cleared-image cache** — once an image is judged safe, it's never re-classified during that page lifetime.
 
@@ -92,7 +101,7 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
   - Lonely → "Loneliness often fuels the scroll. A quick message to someone real lands deeper."
   - Tired → time-of-day branch ("It's getting late" after 9 pm; otherwise "Your body's giving a signal")
 - **Built-in breathing exercise** — 3 cycles of 4-second inhale / hold / exhale, full-screen overlay.
-- **Appeal flow** — if you believe a page was wrongly flagged, NSFW.js runs against a screenshot. Safe results add the domain to your trust list automatically.
+- **Appeal flow** — if you believe a page was wrongly flagged, CleanTab fetches the page and up to 8 of its own images (credentials omitted) and classifies them locally. **No screenshot is ever taken** — `captureVisibleTab` appears nowhere in the codebase. Fewer than 3 classifiable images returns *inconclusive* and holds the block, rather than handing out a permanent bypass by accident.
 
 ### Anti-streak gamification (ring model)
 - **Daily ring goal** — closes when you accumulate enough clean browsing minutes today. Based on the Zeigarnik effect (the brain hates unfinished circles) and Apple Watch's motivational pattern.
@@ -102,12 +111,17 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
 - **16-week heatmap** — visualizes when your rings closed, like GitHub contributions.
 - **Pattern insights** — after 10 reflections, the popup surfaces which triggers (Bored, Tired, etc.) come up most often.
 
-### Disable friction
-- **Randomized passphrase** — pool of 8 reflective phrases ("Discipline is choosing what I want most over what I want right now."). A different one is picked each time you try to disable.
-- **1-hour cooldown** — between the first passphrase entry and the second. Enough time for the impulse to pass.
+### Disable friction — "lock strength"
+- **Randomized passphrase** — pool of 8 reflective phrases. A different one is picked each time you try to disable.
+- **Escalating cooldown** — 1 hour the first time, doubling on each disable within a 7-day window (2h, 4h, 8h…) capped at 24h. Decays after a week, so one bad week doesn't punish you indefinitely. A flat wait treated the first slip and the fifth identically.
 - **Two-stage confirmation** — type the passphrase, wait the cooldown, type it again to actually disable.
-- **Time-bounded pause** — disable for 5 / 15 / 30 minutes; auto re-enables.
-- **No paste, no autocomplete** — passphrase entry blocks pasting and drag-drop.
+- **Accountability partner** — a second person sets a passphrase and keeps it; only a one-way SHA-256 hash is stored, locally. No account, no server, no stored contact details. The partner gate runs *before* the cooldown, so the wait isn't spent by someone who was never getting through.
+- **Lock window** — nominate hours (default 10pm–6am) when the off switch does not exist. Cannot be edited or switched off from inside the window itself.
+- **Managed policy** — an administrator can force-install via `ExtensionInstallForcelist` and pin settings through `chrome.storage.managed` (`allowDisable`, `allowAppeals`, `allowTrustSites`, `sensitivity`, `lockedTrustedSites`). The only layer that is genuinely unremovable. See `/deploy`.
+- **Time-bounded pause** — disable for 5 / 15 / 30 minutes; auto re-enables on an alarm even if the popup is never reopened.
+- **No paste, no autocomplete** — both the reflective passphrase and the partner passphrase block pasting and drag-drop.
+
+> **The rule that governs this whole section:** friction on *turning CleanTab off* is as high as possible; friction on *getting past one false positive* stays near zero. "Let me through once" is never gated — not by a partner lock, not by a lock window, not by policy. A misfire that becomes unreachable content is what makes people distrust the tool and remove it wholesale.
 
 ### Privacy
 - **100% local** — all data lives in `chrome.storage.local`. Nothing is ever transmitted.
@@ -208,8 +222,10 @@ Not built. Use export/import to manually move your data. If user demand is high 
 
 These are technically true but worth being explicit about so the copy doesn't oversell:
 
-- We do **not** claim 100% detection. False negatives happen — especially on platforms outside the visual-platform allowlist.
-- We do **not** claim to be tamper-proof. The passphrase pool is in the source code. A determined user with developer-tools open can defeat any client-side blocker. The friction is for the version of you that's *not* determined.
+- We do **not** claim 100% detection. False negatives happen. (The visual-platform allowlist is gone as of 2026-09-17 — image scanning runs everywhere — but the classifier is still general-purpose and biased on swimwear, lingerie and fine art.)
+- We do **not** claim to be tamper-proof *unless* force-installed by admin policy, and Google's own documentation calls even that best-effort. Without policy: the passphrase pool is in the source, and developer tools defeat any client-side blocker. The friction is for the version of you that's *not* determined.
+- We **do** now claim strong lock-out: escalating cooldown, lock window, partner-held passphrase, managed policy. See `/deploy`.
+- We are **one layer of three**. DNS filtering and OS controls cover what an extension cannot. Say this before a user discovers it.
 - We do **not** claim therapeutic outcomes. CleanTab is a tool, not a treatment. If compulsive behavior is interfering with your life, talk to someone qualified.
 
 Being honest about these makes the rest of the copy land harder.

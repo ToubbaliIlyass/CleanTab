@@ -27,9 +27,11 @@ This project is completely free and open for anyone who wants to reclaim their a
 
 ## ✨ Features
 
-- 🔍 **Smart Detection** — analyzes active tabs to detect NSFW images or adult indicators.  
-- 🚫 **Auto Redirect** — instantly redirects you to a safe or customizable page.  
-- 🧩 **Lightweight & Private** — no tracking, no analytics, no external APIs.  
+- 🔍 **Smart Detection** — scores page text, titles and links; optionally classifies images you linger on.  
+- 🎚 **Three sensitivity levels** — tune how much signal it needs before blocking, instead of turning it off.  
+- 🚫 **A pause, not a wall** — every block offers a one-time pass or a reviewed, revocable trust entry.  
+- 📋 **Nothing hidden** — every trusted site is listed and removable; the popup shows what's happening on the current tab.  
+- 🧩 **Genuinely offline** — model weights and fonts ship with the extension. No servers, no analytics, no external requests.  
 - 🧘 **Mindful Interface** — clean design, gentle feedback, and focus reminders.  
 - ❤️ **Open Source** — contribute, customize, and make it yours.
 
@@ -56,7 +58,7 @@ You can customize detection rules and redirect destinations easily.
 - **JavaScript / TypeScript**  
 - **HTML + CSS** (Popup + Redirect Page)  
 - **Local Storage API** for settings  
-- **Optional:** TensorFlow.js or NSFW.js for image classification  
+- **NSFW.js + TensorFlow.js** bundled locally (MobileNetV2, ~2.7 MB) in an offscreen document  
 
 ---
 

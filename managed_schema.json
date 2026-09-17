@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CleanTab managed configuration",
+  "description": "Values an administrator sets by policy. Anything set here is authoritative and read-only in the extension UI; anything left unset stays the user's own choice.",
+  "type": "object",
+  "properties": {
+    "sensitivity": {
+      "title": "Detection sensitivity",
+      "description": "Which threshold profile to lock. Strict blocks on weaker signals and produces more false positives.",
+      "type": "string",
+      "enum": ["strict", "balanced", "lenient"]
+    },
+    "enableDwellDetection": {
+      "title": "Image scanning",
+      "description": "Classify images the user lingers on. Runs locally; costs battery.",
+      "type": "boolean"
+    },
+    "allowDisable": {
+      "title": "Allow the user to disable protection",
+      "description": "Set false to remove the off switch entirely. The per-page escape hatches are governed separately and should normally stay available.",
+      "type": "boolean"
+    },
+    "allowAppeals": {
+      "title": "Allow 'This site is fine'",
+      "description": "Set false to stop the user granting a site permanent trust from the pause screen. 'Let me through once' is unaffected.",
+      "type": "boolean"
+    },
+    "allowTrustSites": {
+      "title": "Allow the user to add trusted sites",
+      "description": "Set false to make the trust list read-only in the popup.",
+      "type": "boolean"
+    },
+    "lockedTrustedSites": {
+      "title": "Administrator trust list",
+      "description": "Domains that are always trusted and cannot be removed by the user.",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

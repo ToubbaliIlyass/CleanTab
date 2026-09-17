@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600&display=swap");
 
 /* ── Reset ────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -112,9 +111,11 @@ html, body {
 }
 .panel.hidden { display: none; }
 
-/* Progress tab shouldn't vertically center — it fills from top */
+/* Only the Now tab centres; the rest fill from the top and scroll. */
 #panel-progress { justify-content: flex-start; }
-#panel-guard    { justify-content: flex-start; }
+#panel-guard    { justify-content: flex-start; overflow-y: auto; padding-bottom: 16px; }
+#panel-sites    { justify-content: flex-start; overflow-y: auto; padding-bottom: 16px; }
+#panel-now      { justify-content: flex-start; gap: 12px; overflow-y: auto; padding-bottom: 12px; }
 
 /* ── TODAY: Ring ──────────────────────────────────────────────────── */
 .ring-stage {
@@ -128,21 +129,21 @@ html, body {
 }
 
 .ring-svg {
-  width: 180px;
-  height: 180px;
+  width: 140px;
+  height: 140px;
   overflow: visible;
 }
 
 .ring-track {
   fill: none;
   stroke: var(--s2);
-  stroke-width: 12;
+  stroke-width: 10;
 }
 
 .ring-fill {
   fill: none;
   stroke: url(#rg);
-  stroke-width: 12;
+  stroke-width: 10;
   stroke-linecap: round;
   transition: stroke-dasharray 0.9s cubic-bezier(0.4,0,0.2,1);
 }
@@ -560,3 +561,314 @@ html, body {
 .btn-danger:hover { background: rgba(239,68,68,.1); }
 
 .btn.disabled, .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Current-site card — the popup's answer to "what is CleanTab doing on
+   the page in front of me?". Before this, it answered only "how have I
+   done overall", which is not a question anyone opens a popup twice for.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.site-card {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--s1);
+}
+
+.site-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-favicon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--s3);
+  color: var(--text2);
+  font-family: var(--ff-d);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-domain {
+  font-family: var(--ff-d);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.site-pill {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: 3px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+.site-pill.protected { background: #F0FDF4; color: var(--ok);    border: 1px solid #BBF7D0; }
+.site-pill.trusted   { background: var(--abg); color: var(--accent); border: 1px solid var(--aborder); }
+.site-pill.neutral   { background: var(--s2);  color: var(--text2); border: 1px solid var(--border); }
+
+.site-meta {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text2);
+}
+
+.site-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+.site-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--ff-b);
+  color: var(--text2);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.site-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.site-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.site-pause-opts { display: flex; gap: 6px; margin-top: 6px; }
+
+.pause-opt {
+  flex: 1;
+  padding: 5px 4px;
+  font-size: 11px;
+  font-family: var(--ff-b);
+  color: var(--text2);
+  background: var(--s2);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pause-opt:hover { background: var(--abg); color: var(--accent); }
+
+/* ── Ring context line ──────────────────────────────────────────────── */
+
+.ring-context {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text2);
+  margin-top: -4px;
+  flex-shrink: 0;
+}
+
+/* ── Inline insight ─────────────────────────────────────────────────── */
+
+.insight-inline {
+  flex-shrink: 0;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--s1);
+  font-size: 11.5px;
+  color: var(--text2);
+  text-align: center;
+}
+
+/* ── Site rows (Sites tab) ──────────────────────────────────────────── */
+
+.site-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+
+.site-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: var(--s1);
+}
+
+.site-row-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+.site-row-domain {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-row-sub {
+  font-size: 10.5px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-btn {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-family: var(--ff-b);
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.row-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.add-row { display: flex; gap: 6px; margin-top: 8px; }
+.add-row .data-btn { flex-shrink: 0; }
+
+.text-input.small { padding: 7px 10px; font-size: 12px; flex: 1; }
+
+/* ── Sensitivity (Guard tab) ────────────────────────────────────────── */
+
+.sens-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+
+.sens-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: var(--s1);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--ff-b);
+  transition: border-color .15s, background .15s;
+}
+.sens-btn:hover { border-color: var(--accent); }
+.sens-btn.selected { border-color: var(--accent); background: var(--abg); }
+
+.sens-title { font-size: 12.5px; font-weight: 700; color: var(--text); }
+.sens-sub   { font-size: 11px; color: var(--text2); line-height: 1.4; }
+
+/* ── Toggle row ─────────────────────────────────────────────────────── */
+
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+.toggle-row input { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+.toggle-row input:disabled { opacity: .4; }
+.toggle-copy { display: flex; flex-direction: column; gap: 2px; }
+.toggle-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.toggle-sub   { font-size: 11px; color: var(--text2); line-height: 1.4; }
+
+/* ── Header badge: "Text only" when the classifier is unavailable ───── */
+
+.badge.warn {
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+
+.flow-desc.subtle { font-size: 11.5px; color: var(--text3); margin-top: 8px; }
+
+/* ── Four tabs instead of three ─────────────────────────────────────── */
+
+.tab span { font-size: 10px; }
+
+/* ── Lock strength ──────────────────────────────────────────────────── */
+
+.lock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+}
+
+.lock-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lock-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.lock-sub   { font-size: 11px; color: var(--text2); line-height: 1.4; }
+
+.lock-check { accent-color: var(--accent); flex-shrink: 0; }
+.lock-check:disabled { opacity: .4; }
+
+.guard-btn.small {
+  width: auto;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 11.5px;
+}
+.guard-btn.small.ghost {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+
+.lock-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 12px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.lock-hint { font-size: 11px; color: var(--text2); line-height: 1.5; }
+
+.text-input.small {
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.lock-error { font-size: 11px; color: #C0392B; line-height: 1.4; }
+
+.lock-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.hour-pair { display: flex; gap: 10px; }
+
+.hour-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.hour-field select {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 7px 8px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Shown when an administrator policy governs a control the user is looking at. */
+.managed-note {
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text2);
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

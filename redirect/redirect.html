@@ -4,8 +4,12 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CleanTab</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <!-- The pause page replaces the blocked tab, so without this the tab keeps a
+       generic globe icon and reads as a broken page rather than a deliberate one. -->
+  <link rel="icon" type="image/png" sizes="16x16" href="../Assets/icon16.png"/>
+  <link rel="icon" type="image/png" sizes="48x48" href="../Assets/icon48.png"/>
+  <link rel="icon" type="image/png" sizes="128x128" href="../Assets/icon128.png"/>
+  <link rel="stylesheet" href="../Assets/fonts/fonts.css"/>
   <link rel="stylesheet" href="redirect.css"/>
 </head>
 <body>
@@ -66,7 +70,20 @@
       <div class="secondary">
         <button class="sec-btn" id="breatheBtn">Take a beat</button>
         <span class="sec-sep">·</span>
-        <button class="sec-btn appeal" id="appeal-btn">This was wrongly flagged</button>
+        <button class="sec-btn" id="wrongBtn">This was wrongly flagged</button>
+      </div>
+
+      <!-- Escape hatches. Revealed only after "wrongly flagged", so the default path
+           stays the pause rather than the way around it. -->
+      <div class="escape" id="escapeBox" style="display:none">
+        <button class="escape-btn" id="allowOnceBtn">
+          <span class="escape-title">Let me through once</span>
+          <span class="escape-sub">This page only, 10 minutes. Nothing saved.</span>
+        </button>
+        <button class="escape-btn" id="trustSiteBtn">
+          <span class="escape-title">This site is fine</span>
+          <span class="escape-sub" id="trustSiteSub">Check its images and trust it from now on.</span>
+        </button>
       </div>
 
       <div class="appeal-result" id="appeal-status"></div>
@@ -74,6 +91,13 @@
     </main>
   </div>
 
+  <script src="../shared/dates.js"></script>
+  <script src="../shared/domains.js"></script>
+  <script src="../shared/thresholds.js"></script>
+  <script src="../shared/schema.js"></script>
+  <script src="../shared/migrations/v0_to_v1.js"></script>
+  <script src="../shared/migrations/v1_to_v2.js"></script>
+  <script src="../shared/storage.js"></script>
   <script src="redirect.js"></script>
 </body>
 </html>

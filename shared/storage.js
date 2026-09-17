@@ -1,9 +1,9 @@
 // Central storage module — all reads/writes go through here.
-// Depends on: shared/schema.js, shared/dates.js, shared/migrations/v0_to_v1.js
-// (Loaded via manifest content_scripts / background imports)
-
-const HISTORY_MAX_DAYS = 365;
-const REFLECTION_MAX = 1000;
+//
+// Load order matters; these are plain globals, not ES modules (the project has no build
+// step, and adding one to ship a 300-line storage layer isn't worth it):
+//   shared/dates.js, shared/domains.js, shared/thresholds.js, shared/schema.js,
+//   shared/migrations/*.js, then this file.
 
 // ─── Low-level helpers ────────────────────────────────────────────────────────
 
@@ -19,107 +19,137 @@ function storageRemove(keys) {
   return new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
 }
 
+// Session storage is cleared when the browser closes and is not exposed to content
+// scripts. It holds anything we deliberately do not want to persist: per-tab scan
+// verdicts, the URL a tab was redirected away from, and temporary allowances.
+function sessionGet(keys) {
+  return new Promise((resolve) => chrome.storage.session.get(keys, resolve));
+}
+
+function sessionSet(updates) {
+  return new Promise((resolve) => chrome.storage.session.set(updates, resolve));
+}
+
+function sessionRemove(keys) {
+  return new Promise((resolve) => chrome.storage.session.remove(keys, resolve));
+}
+
 // ─── Bootstrap & migration ────────────────────────────────────────────────────
 
 async function bootstrap() {
   const raw = await storageGet(null);
   const dateStr = todayLocal();
 
-  if (!raw.schemaVersion) {
-    // First run or pre-v1 install — migrate legacy state then write defaults
-    const migrated = migrateV0ToV1(raw, dateStr);
-    await storageSet(migrated);
+  let state = raw;
 
-    // Remove old keys that no longer exist in v1
+  if (!state.schemaVersion) {
+    state = migrateV0ToV1(state, dateStr);
     const legacyKeys = [
       "streak", "lastStreakDay", "redirectsToday", "streakBrokenToday",
       "lastReset", "appealCooldowns",
     ];
     const toRemove = legacyKeys.filter((k) => k in raw);
     if (toRemove.length) await storageRemove(toRemove);
-
-    return migrated;
   }
 
-  // Future: if (raw.schemaVersion === 1) runV1ToV2(raw) etc.
-  return raw;
+  if (state.schemaVersion === 1) {
+    state = migrateV1ToV2(state);
+    await storageSet(state);
+    if ("safeDomains" in state) await storageRemove(["safeDomains"]);
+  }
+
+  // Backfill any key a partially-written profile is missing, without clobbering values.
+  const defaults = getDefaults(dateStr);
+  const missing = {};
+  for (const [k, v] of Object.entries(defaults)) {
+    if (state[k] === undefined) missing[k] = v;
+  }
+  if (Object.keys(missing).length) {
+    await storageSet(missing);
+    state = { ...state, ...missing };
+  }
+
+  return state;
 }
 
 // ─── Daily rollover ───────────────────────────────────────────────────────────
 
 async function handleDailyRollover() {
-  const data = await storageGet(["today", "totals", "history", "goalMinutes"]);
+  const data = await storageGet(["today", "totals", "history", "goalMinutes", "cleanShareGoal"]);
   const today = data.today || {};
   const dateStr = todayLocal();
 
-  if (today.date === dateStr) return; // Already on today
+  if (today.date === dateStr) return;
 
-  // Archive yesterday into history
-  if (today.date) {
-    const history = data.history || {};
-    const goal = data.goalMinutes || 120;
-    const ringClosed = today.ringClosedAt !== null || today.cleanMinutes >= goal;
-
-    history[today.date] = {
-      cleanMinutes: today.cleanMinutes || 0,
-      goalMinutes: goal,
-      redirects: today.redirects || 0,
-      reflections: today.reflections || 0,
-      ringClosed,
-    };
-
-    // Trim to last 365 days
-    const keys = Object.keys(history).sort();
-    while (keys.length > HISTORY_MAX_DAYS) {
-      delete history[keys.shift()];
-    }
-
-    // Update cumulative totals
-    const totals = data.totals || { closedDays: 0, reflectionsLogged: 0, lifetimeCleanMinutes: 0 };
-    if (ringClosed) totals.closedDays += 1;
-    totals.lifetimeCleanMinutes += today.cleanMinutes || 0;
-
-    await storageSet({
-      history,
-      totals,
-      today: getDefaultToday(dateStr),
-    });
-  } else {
+  if (!today.date) {
     await storageSet({ today: getDefaultToday(dateStr) });
+    return;
   }
+
+  const history = data.history || {};
+  const goal = data.goalMinutes || 120;
+  const shareGoal = data.cleanShareGoal ?? 0.95;
+  const ringClosed = ringIsClosed(today, shareGoal);
+
+  history[today.date] = {
+    cleanMinutes: today.cleanMinutes || 0,
+    browsedMinutes: today.browsedMinutes || 0,
+    cleanShare: cleanShare(today),
+    goalMinutes: goal,
+    cleanShareGoal: shareGoal,
+    redirects: today.redirects || 0,
+    reflections: today.reflections || 0,
+    ringClosed,
+  };
+
+  const keys = Object.keys(history).sort();
+  while (keys.length > HISTORY_MAX_DAYS) delete history[keys.shift()];
+
+  const totals = data.totals || { closedDays: 0, reflectionsLogged: 0, lifetimeCleanMinutes: 0 };
+  if (ringClosed) totals.closedDays = (totals.closedDays || 0) + 1;
+  totals.lifetimeCleanMinutes = (totals.lifetimeCleanMinutes || 0) + (today.cleanMinutes || 0);
+
+  await storageSet({ history, totals, today: getDefaultToday(dateStr) });
 }
 
-// ─── Clean minute tracking ────────────────────────────────────────────────────
+// ─── Minute tracking ──────────────────────────────────────────────────────────
 
-async function incrementCleanMinute() {
-  const data = await storageGet(["today", "goalMinutes", "totals"]);
-  const today = { ...data.today };
-  const goal = data.goalMinutes || 120;
+// `clean` is the foreground tab's most recent scan verdict. Both counters advance on a
+// scanned tab; only cleanMinutes advances when nothing was flagged. A tab we could not
+// scan (chrome://, the PDF viewer, a restricted page) advances neither — it is neutral,
+// not virtuous, and counting it was the reason the old metric meant nothing.
+async function tickMinute(clean) {
+  const data = await storageGet(["today", "cleanShareGoal"]);
+  const today = { ...(data.today || {}) };
+  const shareGoal = data.cleanShareGoal ?? 0.95;
 
-  today.cleanMinutes = (today.cleanMinutes || 0) + 1;
+  today.browsedMinutes = (today.browsedMinutes || 0) + 1;
+  if (clean) today.cleanMinutes = (today.cleanMinutes || 0) + 1;
 
-  const updates = { today };
-
-  // Mark ring closed the first time we hit the goal
-  if (!today.ringClosedAt && today.cleanMinutes >= goal) {
+  // ringClosedAt records when the ring FIRST closed. The share can dip below the goal
+  // again after a later block; the day still counts as closed, matching how the old
+  // minute-total ring behaved once it was full.
+  if (!today.ringClosedAt && ringIsClosed(today, shareGoal)) {
     today.ringClosedAt = Date.now();
-    const totals = { ...(data.totals || {}) };
-    // Note: closedDays is incremented at rollover, not here,
-    // so we don't double-count.
-    updates.totals = totals;
   }
 
-  await storageSet(updates);
+  await storageSet({ today });
   return today;
 }
 
-// ─── Redirect recording ───────────────────────────────────────────────────────
+// ─── Redirect / block log ─────────────────────────────────────────────────────
 
-async function recordRedirect() {
-  const data = await storageGet(["today"]);
-  const today = { ...data.today };
+async function recordBlock(domain, reason) {
+  const data = await storageGet(["today", "blocks"]);
+
+  const today = { ...(data.today || {}) };
   today.redirects = (today.redirects || 0) + 1;
-  await storageSet({ today });
+
+  const blocks = [...(data.blocks || [])];
+  blocks.unshift({ ts: Date.now(), domain: normalizeDomain(domain), reason });
+  while (blocks.length > BLOCK_LOG_MAX) blocks.pop();
+
+  await storageSet({ today, blocks });
 }
 
 // ─── Reflection recording ─────────────────────────────────────────────────────
@@ -127,31 +157,88 @@ async function recordRedirect() {
 async function recordReflection(chip, domain) {
   const data = await storageGet(["today", "totals", "reflections"]);
 
-  const today = { ...data.today };
+  const today = { ...(data.today || {}) };
   today.reflections = (today.reflections || 0) + 1;
 
   const totals = { ...(data.totals || {}) };
   totals.reflectionsLogged = (totals.reflectionsLogged || 0) + 1;
 
   const reflections = [...(data.reflections || [])];
-  reflections.push({ ts: Date.now(), chip, domain });
-
-  // Cap at 1000 entries
+  reflections.push({ ts: Date.now(), chip, domain: normalizeDomain(domain) });
   while (reflections.length > REFLECTION_MAX) reflections.shift();
 
   await storageSet({ today, totals, reflections });
   return totals.reflectionsLogged;
 }
 
-// ─── Safe domain management ───────────────────────────────────────────────────
+// ─── Trust management ─────────────────────────────────────────────────────────
 
-async function addSafeDomain(domain) {
-  const data = await storageGet(["safeDomains"]);
-  const domains = data.safeDomains || [];
-  if (!domains.includes(domain)) {
-    domains.push(domain);
-    await storageSet({ safeDomains: domains });
-  }
+async function addTrustedSite(domain, source = "manual") {
+  const norm = normalizeDomain(domain);
+  if (!norm) return false;
+  const data = await storageGet(["trustedSites"]);
+  const sites = data.trustedSites || [];
+  if (sites.some((e) => trustEntryDomain(e) === norm)) return false;
+  sites.push(makeTrustEntry(norm, source));
+  await storageSet({ trustedSites: sites });
+  return true;
+}
+
+async function removeTrustedSite(domain) {
+  const norm = normalizeDomain(domain);
+  const data = await storageGet(["trustedSites"]);
+  const sites = (data.trustedSites || []).filter((e) => trustEntryDomain(e) !== norm);
+  await storageSet({ trustedSites: sites });
+}
+
+// ─── Temporary allowances (session-only) ──────────────────────────────────────
+//
+// "Let me through once" — the common response to a false positive. Scoped to one URL,
+// time-boxed, and gone when the browser closes. A permanent domain-wide whitelist was
+// the heaviest possible answer to "this one page was wrong".
+
+const ALLOWANCE_KEY = "urlAllowances";
+const ALLOWANCE_MS = 10 * 60 * 1000;
+
+async function grantAllowance(url, ms = ALLOWANCE_MS) {
+  const data = await sessionGet([ALLOWANCE_KEY]);
+  const allowances = data[ALLOWANCE_KEY] || {};
+  allowances[url] = Date.now() + ms;
+  await sessionSet({ [ALLOWANCE_KEY]: allowances });
+}
+
+async function hasAllowance(url) {
+  const data = await sessionGet([ALLOWANCE_KEY]);
+  const allowances = data[ALLOWANCE_KEY] || {};
+  const until = allowances[url];
+  return Boolean(until && until > Date.now());
+}
+
+// ─── Per-site pause (session-only) ────────────────────────────────────────────
+
+const SITE_PAUSE_KEY = "sitePauses";
+
+async function pauseSite(domain, ms) {
+  const norm = normalizeDomain(domain);
+  const data = await sessionGet([SITE_PAUSE_KEY]);
+  const pauses = data[SITE_PAUSE_KEY] || {};
+  pauses[norm] = Date.now() + ms;
+  await sessionSet({ [SITE_PAUSE_KEY]: pauses });
+}
+
+async function getSitePause(domain) {
+  const norm = normalizeDomain(domain);
+  const data = await sessionGet([SITE_PAUSE_KEY]);
+  const until = (data[SITE_PAUSE_KEY] || {})[norm];
+  return until && until > Date.now() ? until : null;
+}
+
+async function clearSitePause(domain) {
+  const norm = normalizeDomain(domain);
+  const data = await sessionGet([SITE_PAUSE_KEY]);
+  const pauses = data[SITE_PAUSE_KEY] || {};
+  delete pauses[norm];
+  await sessionSet({ [SITE_PAUSE_KEY]: pauses });
 }
 
 // ─── Goal calibration ─────────────────────────────────────────────────────────
@@ -166,23 +253,25 @@ async function recalibrateGoal() {
   const history = data.history || {};
   const currentGoal = data.goalMinutes || 120;
 
-  const recent = Object.values(history)
+  // Sort by date first — Object.values() order is insertion order, so the old
+  // .slice(-30) was taking whichever 30 days happened to be written last.
+  const recent = Object.keys(history)
+    .sort()
     .slice(-30)
-    .map((d) => d.cleanMinutes || 0)
+    .map((k) => history[k].cleanMinutes || 0)
     .sort((a, b) => a - b);
 
-  if (recent.length < 7) return; // Not enough data yet
+  if (recent.length < 7) return;
 
   const median = recent[Math.floor(recent.length / 2)];
   const targetGoal = Math.min(240, Math.max(60, Math.round(median * 0.7)));
-
-  // Blend: move 20% toward the new target
   const blended = Math.round(currentGoal + (targetGoal - currentGoal) * 0.2);
   await storageSet({ goalMinutes: blended });
 }
 
-// ─── Full state read (for popup / export) ─────────────────────────────────────
+// ─── Sensitivity ──────────────────────────────────────────────────────────────
 
-async function getFullState() {
-  return storageGet(null);
+async function getSensitivityProfile() {
+  const data = await storageGet(["sensitivity"]);
+  return getProfile(data.sensitivity);
 }

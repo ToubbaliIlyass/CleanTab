@@ -200,3 +200,211 @@ html, body {
   background: #e85a24;
   transform: translateY(-1px);
 }
+
+/* ── Multi-step shell ───────────────────────────────────────────────── */
+
+.step { display: none; }
+.step.is-active { display: flex; }
+
+.step-dots { display: flex; gap: 6px; align-items: center; }
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--s3, #E8E4DC);
+  transition: background .2s, width .2s;
+}
+.dot.active { background: var(--accent); width: 18px; border-radius: 3px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; }
+
+/* ── Fact list (step 1) ─────────────────────────────────────────────── */
+
+.fact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+  padding-left: 18px;
+}
+
+.fact-list li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text2);
+}
+.fact-list li strong { color: var(--text); font-weight: 600; }
+
+/* ── Vertical chips (sensitivity) ───────────────────────────────────── */
+
+.chips.vertical { flex-direction: column; align-items: stretch; }
+
+.chip.wide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  padding: 13px 16px;
+}
+
+.chip-title { font-size: 14px; font-weight: 700; }
+.chip-sub   { font-size: 12.5px; opacity: .8; line-height: 1.45; font-weight: 400; }
+
+/* ── Ghost button ───────────────────────────────────────────────────── */
+
+.ghost-btn {
+  background: none;
+  border: none;
+  font-family: var(--ff-b);
+  font-size: 13px;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 0;
+}
+.ghost-btn:hover { color: var(--accent); }
+
+.footer-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+/* ── Acknowledgement gate ───────────────────────────────────────────── */
+
+.ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text2);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.ack:hover { border-color: var(--aborder); }
+.ack:has(input:checked) {
+  background: var(--abg);
+  border-color: var(--aborder);
+  color: var(--text);
+}
+
+.ack input {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border: 1.5px solid var(--text3);
+  border-radius: 5px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.ack input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+/* Drawn rather than a glyph so it lines up at every zoom level. */
+.ack input:checked::after {
+  content: "";
+  display: block;
+  width: 4.5px;
+  height: 8.5px;
+  margin: 1.5px auto 0;
+  border: solid var(--bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.ack input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Numbered instructions ──────────────────────────────────────────── */
+
+.fact-list.numbered {
+  list-style: decimal;
+  padding-left: 20px;
+}
+.fact-list.numbered li { padding-left: 2px; }
+.fact-list.numbered li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ── Hints ──────────────────────────────────────────────────────────── */
+
+.hint {
+  margin-top: 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text3);
+}
+
+/* ── Incognito step ─────────────────────────────────────────────────── */
+
+.incognito-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--s1);
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.status-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text3);
+}
+
+/* Pending is the honest default: nothing has been verified yet. */
+.status[data-state="pending"] .status-dot {
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.status[data-state="ok"] {
+  background: rgba(34,150,83,.07);
+  border-color: rgba(34,150,83,.25);
+  color: #1C1915;
+}
+.status[data-state="ok"] .status-dot { background: #229653; animation: none; }
+
+.status[data-state="skipped"],
+.status[data-state="unknown"] { color: var(--text3); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status[data-state="pending"] .status-dot { animation: none; }
+}
+
+/* ── Footer with two actions ────────────────────────────────────────── */
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+/* A gated Next has to look unavailable, or the screen reads as broken. */
+.done-btn:disabled {
+  opacity: .38;
+  cursor: not-allowed;
+}

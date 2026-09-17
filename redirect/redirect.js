@@ -1,12 +1,18 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const params = new URLSearchParams(window.location.search);
-  const reason = params.get("reason");
-  const originalUrl = params.get("original");
-  const domain = (() => { try { return new URL(originalUrl).hostname; } catch { return ""; } })();
+document.addEventListener("DOMContentLoaded", async () => {
+  // The blocked URL no longer travels in the query string — it lived in the omnibox,
+  // in history and in session restore. The worker hands it over by tab id instead.
+  const ctx = await new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "getBlockContext" }, (res) => {
+      resolve(chrome.runtime.lastError || !res
+        ? { reason: "This page was flagged.", domain: "", canAppeal: false }
+        : res);
+    });
+  });
 
-  // ── Reason text ─────────────────────────────────────────────────────────
+  const domain = ctx.domain || "";
+
   const reasonEl = document.getElementById("reason-text");
-  if (reasonEl && reason) reasonEl.textContent = reason;
+  if (reasonEl && ctx.reason) reasonEl.textContent = ctx.reason;
 
   // ── First-redirect note ──────────────────────────────────────────────────
   chrome.storage.local.get(["firstRedirectSeen"], ({ firstRedirectSeen }) => {
@@ -75,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let logged = false;
 
   document.querySelectorAll(".chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
+    chip.addEventListener("click", async () => {
       if (logged) return;
       logged = true;
 
@@ -83,31 +89,24 @@ document.addEventListener("DOMContentLoaded", () => {
       chipsEl.style.pointerEvents = "none";
       chipsEl.style.opacity = "0.45";
 
-      chrome.storage.local.get(["today", "totals", "reflections", "goalMinutes"], (data) => {
-        const rawToday = data.today || {};
-        const today = { ...rawToday };
-        today.reflections = (today.reflections || 0) + 1;
+      const before = await storageGet(["today", "goalMinutes"]);
+      const total = await recordReflection(chip.dataset.chip, domain);
+      const after = await storageGet(["totals"]);
 
-        const totals = { ...(data.totals || {}) };
-        totals.reflectionsLogged = (totals.reflectionsLogged || 0) + 1;
+      if (loggedEl) loggedEl.style.display = "flex";
+      if (loggedText) loggedText.textContent = `Logged. ${total} total.`;
 
-        const reflections = [...(data.reflections || [])];
-        reflections.push({ ts: Date.now(), chip: chip.dataset.chip, domain });
-        while (reflections.length > 1000) reflections.shift();
-
-        chrome.storage.local.set({ today, totals, reflections }, () => {
-          if (loggedEl) loggedEl.style.display = "flex";
-          if (loggedText) loggedText.textContent = `Logged. ${totals.reflectionsLogged} total.`;
-
-          // Show contextual nudge
-          const nudge = buildNudge(chip.dataset.chip, rawToday, totals, data.goalMinutes || 120);
-          if (nudge && nudgeCard && nudgeText) {
-            nudgeText.textContent = nudge.text;
-            if (nudgeBreathe) nudgeBreathe.style.display = nudge.breathe ? "" : "none";
-            nudgeCard.style.display = "";
-          }
-        });
-      });
+      const nudge = buildNudge(
+        chip.dataset.chip,
+        before.today || {},
+        after.totals || {},
+        before.goalMinutes || 120,
+      );
+      if (nudge && nudgeCard && nudgeText) {
+        nudgeText.textContent = nudge.text;
+        if (nudgeBreathe) nudgeBreathe.style.display = nudge.breathe ? "" : "none";
+        nudgeCard.style.display = "";
+      }
     });
   });
 
@@ -120,8 +119,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const PHASES = [
     { cls: "inhale", text: "Breathe in",  ms: 4000 },
-    { cls: "hold",   text: "Hold",         ms: 4000 },
-    { cls: "exhale", text: "Breathe out",  ms: 4000 },
+    { cls: "hold",   text: "Hold",        ms: 4000 },
+    { cls: "exhale", text: "Breathe out", ms: 4000 },
   ];
 
   function runBreathing() {
@@ -148,28 +147,69 @@ document.addEventListener("DOMContentLoaded", () => {
   nudgeBreathe?.addEventListener("click", runBreathing);
   skip?.addEventListener("click", () => overlay.classList.remove("active"));
 
-  // ── Appeal ───────────────────────────────────────────────────────────────
-  const appealBtn = document.getElementById("appeal-btn");
+  // ── Escape hatches ───────────────────────────────────────────────────────
+  //
+  // Two outcomes instead of one. A one-off false positive is the common case and should
+  // cost one click and leave no permanent state; trusting a whole domain is a real
+  // decision and gets a real check. The old single "appeal" button did the second thing
+  // while looking like the first, and its check was reading the wrong page.
+
+  const wrongBtn = document.getElementById("wrongBtn");
+  const escapeBox = document.getElementById("escapeBox");
+  const allowOnceBtn = document.getElementById("allowOnceBtn");
+  const trustSiteBtn = document.getElementById("trustSiteBtn");
+  const trustSiteSub = document.getElementById("trustSiteSub");
   const appealStatus = document.getElementById("appeal-status");
 
-  appealBtn?.addEventListener("click", () => {
-    appealBtn.disabled = true;
-    appealBtn.textContent = "Checking…";
-    if (appealStatus) { appealStatus.className = "appeal-result"; appealStatus.textContent = ""; }
+  function setStatus(text, kind) {
+    if (!appealStatus) return;
+    appealStatus.className = "appeal-result" + (kind ? ` ${kind}` : "");
+    appealStatus.textContent = text;
+  }
 
-    chrome.runtime.sendMessage({ action: "appealRequest" }, (response) => {
-      if (!response) {
-        if (appealStatus) { appealStatus.className = "appeal-result err"; appealStatus.textContent = "Could not reach the extension. Try reloading."; }
-        appealBtn.disabled = false; appealBtn.textContent = "This was wrongly flagged";
+  wrongBtn?.addEventListener("click", () => {
+    if (!escapeBox) return;
+    escapeBox.style.display = escapeBox.style.display === "none" ? "flex" : "none";
+    if (!ctx.canAppeal && trustSiteBtn) {
+      trustSiteBtn.disabled = true;
+      if (trustSiteSub) trustSiteSub.textContent = "This domain is on the adult content blocklist.";
+    } else if (trustSiteSub && domain) {
+      trustSiteSub.textContent = `Check ${domain}'s images and trust it from now on.`;
+    }
+  });
+
+  allowOnceBtn?.addEventListener("click", () => {
+    allowOnceBtn.disabled = true;
+    setStatus("Opening for 10 minutes…", "ok");
+    chrome.runtime.sendMessage({ action: "allowOnce" }, (res) => {
+      if (chrome.runtime.lastError || !res?.ok) {
+        setStatus("Couldn't reopen the page — it may have been lost.", "err");
+        allowOnceBtn.disabled = false;
+      }
+    });
+  });
+
+  trustSiteBtn?.addEventListener("click", () => {
+    trustSiteBtn.disabled = true;
+    setStatus("Checking this page's images…", "");
+
+    chrome.runtime.sendMessage({ action: "appealRequest" }, (res) => {
+      if (chrome.runtime.lastError || !res) {
+        setStatus("Could not reach the extension. Try reloading.", "err");
+        trustSiteBtn.disabled = false;
         return;
       }
-      if (response.status === "approved") {
-        if (appealStatus) { appealStatus.className = "appeal-result ok"; appealStatus.textContent = response.reason || "Approved — taking you back."; }
-        appealBtn.textContent = "Approved";
-        setTimeout(() => { window.location.href = response.originalUrl || originalUrl || "/"; }, 1500);
-      } else {
-        if (appealStatus) { appealStatus.className = "appeal-result"; appealStatus.textContent = response.reason || "This page remains blocked."; }
-        setTimeout(() => { appealBtn.disabled = false; appealBtn.textContent = "This was wrongly flagged"; }, 8000);
+
+      if (res.status === "approved") {
+        setStatus(res.reason, "ok");
+        return; // the worker is navigating this tab back
+      }
+
+      // Both "denied" and "inconclusive" keep the block. Inconclusive says so plainly
+      // rather than clearing the page by default — the old flow's failure mode.
+      setStatus(res.reason, res.status === "inconclusive" ? "" : "err");
+      if (!res.permanent) {
+        setTimeout(() => { trustSiteBtn.disabled = false; }, 8000);
       }
     });
   });

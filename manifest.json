@@ -1,43 +1,59 @@
 {
   "manifest_version": 3,
   "name": "CleanTab",
-  "version": "0.1",
+  "version": "0.2",
   "incognito": "split",
-  "description": "Stay intentional online — CleanTab detects NSFW content and redirects you to focus.",
-  "permissions": ["tabs", "storage", "scripting", "activeTab", "alarms", "idle", "offscreen"],
-  "host_permissions": ["<all_urls>"],
-
+  "description": "Stay intentional online \u2014 CleanTab detects NSFW content and redirects you to focus.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "idle",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },
-
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "shared/domains.js",
+        "shared/keywords.js",
+        "shared/thresholds.js",
+        "shared/scoring.js",
+        "shared/pageshape.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-
   "action": {
     "default_icon": "Assets/icon48.png",
     "default_popup": "popup/popup.html"
-
   },
-
   "icons": {
     "16": "Assets/icon16.png",
     "48": "Assets/icon48.png",
     "128": "Assets/icon128.png"
   },
-
   "web_accessible_resources": [
     {
       "resources": [
         "redirect/redirect.html",
         "onboarding/onboarding.html"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
-  ]
+  ],
+  "storage": {
+    "managed_schema": "managed_schema.json"
+  }
 }

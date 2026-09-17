@@ -1,228 +1,90 @@
 ///////////////////////////////
-// CleanTab — Content Script v0.4
-// Context-aware, SPA-safe, scoring-based NSFW blocker
+// CleanTab — content script
+// Context-aware, SPA-safe, scoring-based detection.
+//
+// Keyword lists (shared/keywords.js), thresholds (shared/thresholds.js) and URL scoring
+// (shared/scoring.js) are loaded ahead of this file by the manifest. They used to be
+// copy-pasted here and in background.js, and the copies had already drifted apart.
 ///////////////////////////////
 
-// ----- Keyword Lists ----- //
+// ── Policy ────────────────────────────────────────────────────────────────────
+//
+// The content script owns no rules. It asks the service worker what applies to this URL
+// and caches the answer. That is what lets sensitivity, per-site pause and one-time
+// allowances take effect without every page touching storage directly.
 
-function resetRedirectProtection() {
-  redirectTriggered = false;
-}
-
-let extensionEnabled = true;
-
-let safeDomains = [];
-
-chrome.storage.local.get(["safeDomains"], (data) => {
-  safeDomains = data.safeDomains || [];
-});
-
-// Replace the storage listeners section
-
-let storageListenerActive = false;
-
-function initializeStorage() {
-  if (storageListenerActive) return;
-
-  // Get initial values
-  chrome.storage.local.get(["safeDomains", "enabled"], (data) => {
-    safeDomains = data.safeDomains || [];
-    extensionEnabled = data.enabled !== false;
-  });
-
-  // Single listener for all storage changes
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local") return;
-
-    if (changes.safeDomains) {
-      safeDomains = changes.safeDomains.newValue || [];
-    }
-
-    if (changes.enabled) {
-      extensionEnabled = changes.enabled.newValue !== false;
-      console.log("CleanTab enabled state changed:", extensionEnabled);
-    }
-  });
-
-  storageListenerActive = true;
-}
-
-// Initialize once
-initializeStorage();
-
-let redirectTriggered = false;
-const keywordWeights = {
-  // High confidence (5 points)
-  porn: 5,
-  nsfw: 5,
-  xxx: 5,
-  hentai: 5,
-  hardcore: 5,
-  bdsm: 5,
-  blowjob: 5,
-  pornhub: 5,
-  xvideos: 5,
-  redtube: 5,
-  youporn: 5,
-  nude: 3,
-
-  // Medium confidence (3 points)
-
-  sex: 3,
-  explicit: 3,
-  "18+": 3,
-  onlyfans: 3,
-  lewd: 3,
-  cam: 3,
-  cams: 3,
-
-  // Low confidence (2 points)
-  sexy: 2,
-  thirst: 2,
-  fuck: 2,
+let policy = {
+  enabled: true,
+  trusted: false,
+  sitePausedUntil: null,
+  allowed: false,
+  profile: getProfile("balanced"),
+  dwellEnabled: false,
 };
 
-function buildKeywordRegex(keyword) {
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const trailingBoundary = /\w$/.test(keyword) ? "\\b" : "";
-  return new RegExp(`\\b${escaped}${trailingBoundary}`, "i");
+let policyReady = false;
+
+function refreshPolicy() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "getTabPolicy", url: location.href }, (res) => {
+      if (!chrome.runtime.lastError && res && !res.error) {
+        policy = res;
+        policy.profile = res.profile || getProfile("balanced");
+      }
+      policyReady = true;
+      resolve(policy);
+    });
+  });
 }
 
-const keywordRegexes = Object.entries(keywordWeights).map(([keyword, weight]) => ({
-  regex: buildKeywordRegex(keyword),
-  weight,
-}));
-
-function getKeywordScore(text) {
-  let score = 0;
-  for (const { regex, weight } of keywordRegexes) {
-    if (regex.test(text)) {
-      score += weight;
-    }
-  }
-  return score;
+function scanningSuppressed() {
+  if (!policy.enabled) return true;
+  if (policy.trusted) return true;
+  if (policy.allowed) return true;
+  if (policy.sitePausedUntil && policy.sitePausedUntil > Date.now()) return true;
+  return false;
 }
 
-// ----- Environment keyword clusters ----- //
+// ── Environment keyword clusters ──────────────────────────────────────────────
 
-// Strong adult anchors (REQUIRED)
+// NOTE: getEnvironmentScore matches these as plain substrings, not word-boundary
+// anchored. Only terms that are safe to match loosely belong here — "cam" already
+// lights up on camera retailers (checklist test 2.x / MANUAL C6). That is why "pussy"
+// and "tits" are scored as keywords but are NOT anchors: "pussycat" would qualify a
+// page as an adult environment.
 const adultAnchorWords = [
-  "porn",
-  "nsfw",
-  "xxx",
-  "cam",
-  "cams",
-  "hentai",
-  "blowjob",
-  "bdsm",
-  "nude",
+  "porn", "nsfw", "xxx", "cam", "cams", "hentai", "blowjob", "bdsm", "nude",
+  "naked", "nudes", "milf", "onlyfans", "camgirl", "creampie", "gangbang",
 ];
 
-// Adult context words (only count if anchor exists)
 const adultContextWords = [
-  "model",
-  "models",
-  "private",
-  "room",
-  "girls",
-  "chat",
-  "show",
-  "studio",
+  "model", "models", "private", "room", "girls", "chat", "show", "studio",
 ];
 
-// Neutral media words (AMPLIFIERS only)
 const mediaWords = ["video", "videos", "live", "stream", "watch"];
 
-///////////////////////////////
-// Detect Inside-Post Context
-///////////////////////////////
-function isInsidePost(url) {
-  const lower = url.toLowerCase();
+// Page shape helpers (isInsidePost, isYouTube, isHomeFeed, allowsTextScan) come from
+// shared/pageshape.js, loaded ahead of this file by the manifest.
 
-  const postPatterns = [
-    /\/comments\/\w+/, // Reddit posts
-    /\/status\/\d+/, // Twitter posts
-    /\/p\/[\w-]+/, // Instagram posts
-    /watch\?v=[\w-]+/, // YouTube videos
-    /\/post\/[\w-]+/, // Generic posts
-    /\/posts\/\d+/, // Forum posts
-    /article\/[\w-]+/, // News articles
-  ];
+// ── Scoring ───────────────────────────────────────────────────────────────────
 
-  return postPatterns.some((pattern) => pattern.test(lower));
-}
-
-function isYouTube(url) {
-  return url.includes("youtube.com");
-}
-
-function isYouTubeSearch(url) {
-  return url.includes("youtube.com/results");
-}
-
-const PASSTHROUGH_PARAMS = new Set([
-  "continue", "redirect_uri", "redirect", "next", "return_to",
-  "returnto", "state", "url", "dest", "destination", "goto",
-]);
-
-///////////////////////////////
-// URL Scoring (Strong Signal)
-///////////////////////////////
-function getURLScore(url) {
-  let score = 0;
-  const lower = url.toLowerCase();
-
-  score += getKeywordScore(lower);
-
-  try {
-    const params = new URL(url).searchParams;
-
-    for (const [key, value] of params.entries()) {
-      if (PASSTHROUGH_PARAMS.has(key.toLowerCase())) continue;
-      const v = (value || "").toLowerCase();
-      score += getKeywordScore(v) * 1.5;
-    }
-  } catch (e) {
-    // some URLs crash URL parser — safe to ignore
-  }
-
-  return score;
-}
-
-///////////////////////////////
-// Text Scoring (Weak Signal)
-///////////////////////////////
 function getTextScore() {
-  const text = document.body.innerText.toLowerCase();
-  return getKeywordScore(text);
+  return getKeywordScore((document.body?.innerText || "").toLowerCase());
 }
 
 function getExplicitTitleScore() {
   let score = 0;
-
-  // More targeted selectors - avoid scanning ALL spans
   const elements = document.querySelectorAll(
     'h1, h2, h3, title, [class*="title"], [class*="headline"], a[href*="/"], figcaption',
   );
-
-  // Limit scanning to prevent performance issues
   const maxElements = Math.min(elements.length, 50);
 
   for (let i = 0; i < maxElements; i++) {
-    const text = (
-      elements[i].innerText ||
-      elements[i].textContent ||
-      ""
-    ).toLowerCase();
-    if (!text || text.length > 200) continue; // Skip very long text
-
-    // Use consistent keyword scoring with higher weights for titles
+    const text = (elements[i].innerText || elements[i].textContent || "").toLowerCase();
+    if (!text || text.length > 200) continue;
     score += getKeywordScore(text) * 1.5;
-
-    // Early exit if score is high enough
     if (score >= 15) break;
   }
-
   return score;
 }
 
@@ -230,188 +92,207 @@ function getEnvironmentScore() {
   let anchorCount = 0;
   let score = 0;
 
-  const elements = document.querySelectorAll(
-    "h1, h2, h3, a, button, span, label",
-  );
+  const elements = document.querySelectorAll("h1, h2, h3, a, button, span, label");
 
   elements.forEach((el) => {
     const text = (el.innerText || "").toLowerCase();
     if (!text) return;
 
     adultAnchorWords.forEach((w) => {
-      if (text.includes(w)) {
-        anchorCount += 1;
-        score += 3;
-      }
+      if (text.includes(w)) { anchorCount += 1; score += 3; }
     });
 
-    // Only amplify if at least one adult anchor exists
+    // Context and media words amplify, but only once an adult anchor exists —
+    // otherwise "live stream" and "private room" light up on ordinary sites.
     if (anchorCount > 0) {
-      adultContextWords.forEach((w) => {
-        if (text.includes(w)) score += 1;
-      });
-
-      mediaWords.forEach((w) => {
-        if (text.includes(w)) score += 1;
-      });
+      adultContextWords.forEach((w) => { if (text.includes(w)) score += 1; });
+      mediaWords.forEach((w) => { if (text.includes(w)) score += 1; });
     }
   });
 
-  // Require at least one anchor AND sufficient total score
-  if (anchorCount >= 1 && score >= 5) {
-    return score;
-  }
-
-  return 0;
+  return anchorCount >= 1 ? score : 0;
 }
 
-///////////////////////////////
-// Feed Detection (Avoid False Positives)
-///////////////////////////////
-function isFeedPage(url) {
-  url = url.toLowerCase();
+// ── Scan ──────────────────────────────────────────────────────────────────────
 
-  // Reddit feed & subreddit pages (not posts)
-  if (url === "https://www.reddit.com/") return true;
-  if (url.match(/^https:\/\/www\.reddit\.com\/r\/[^\/]+\/?$/)) return true;
+let redirectTriggered = false;
 
-  // Twitter home
-  if (url.includes("twitter.com/home")) return true;
-
-  // Instagram home
-  if (url === "https://www.instagram.com/") return true;
-
-  return false;
+function resetRedirectProtection() {
+  redirectTriggered = false;
 }
 
-///////////////////////////////
-// Scan Function (Main Logic)
-///////////////////////////////
+function triggerRedirect(reason) {
+  redirectTriggered = true;
+  chrome.runtime.sendMessage({ action: "redirect", reason });
+  setTimeout(resetRedirectProtection, 1500);
+}
+
+function reportVerdict(clean, score) {
+  chrome.runtime.sendMessage({ action: "tabVerdict", clean, score }, () => {
+    void chrome.runtime.lastError; // tab may have navigated away
+  });
+}
+
 function scan() {
   try {
-    if (!extensionEnabled || redirectTriggered) return;
+    if (!policyReady || redirectTriggered) return;
 
-    const domain = location.hostname;
+    const profile = policy.profile;
 
-    // Simple safe domain check - trust user's whitelist completely
-    if (safeDomains.includes(domain)) {
+    if (scanningSuppressed()) {
+      // A trusted site still counts as browsing; a one-time allowance does not count as
+      // clean, because the page was flagged and the user chose to pass anyway.
+      if (policy.enabled) reportVerdict(!policy.allowed, 0);
       return;
     }
 
     const url = window.location.href;
-    const inside = isInsidePost(url);
+    const onYouTube = isYouTube(url);
+    // Text scanning applies to every page shape except an aggregated home feed. It used
+    // to require being inside a post, which left every listing, category, tag and
+    // homepage on the web reachable only by URL keywords.
+    const textScannable = allowsTextScan(url);
 
-    const urlScore = getURLScore(url);
-    const textScore = getTextScore();
-    const explicitTitleScore = getExplicitTitleScore();
+    const scores = {
+      url: getURLScore(url),
+      text: onYouTube ? 0 : getTextScore(),
+      title: getExplicitTitleScore(),
+    };
     const environmentScore = getEnvironmentScore();
-    const riskyEnvironment = environmentScore >= 5;
+    const riskyEnvironment = environmentScore >= profile.envScore;
 
-    // ----------------------------------
-    // 1. Strong URL intent (global)
-    // ----------------------------------
-    if (urlScore >= 5) {
-      redirectTriggered = true;
-      chrome.runtime.sendMessage({
-        action: "redirect",
-        reason: "Search or link contained high-risk keywords",
-      });
-      setTimeout(resetRedirectProtection, 1500);
+    // 1. Strong URL intent — global, applies everywhere including YouTube.
+    if (scores.url >= profile.urlScore) {
+      reportVerdict(false, 5);
+      triggerRedirect("Search or link contained high-risk keywords");
       return;
     }
 
-    // ❌ Never flag normal YouTube videos by text
-    if (isYouTube(url)) {
+    // YouTube used to return unconditionally here, which made every video page a blind
+    // spot. Instead its text signal is dropped (that was the real false-positive source)
+    // and the title bar is raised, so a search results page full of explicit titles can
+    // still trigger while an ordinary video cannot.
+    const titleBar = onYouTube ? profile.titleScore * 1.5 : profile.titleScore;
+
+    // 2. Explicit destination sites — titles everywhere except aggregated home feeds,
+    // where the titles belong to strangers' posts rather than to a chosen destination.
+    if (riskyEnvironment && !isHomeFeed(url) && scores.title >= titleBar) {
+      reportVerdict(false, 5);
+      triggerRedirect("Explicit titles detected across page");
       return;
     }
 
-    // ----------------------------------
-    // Explicit destination sites (titles everywhere)
-    // ----------------------------------
-    if (riskyEnvironment && !isFeedPage(url) && explicitTitleScore >= 6) {
-      redirectTriggered = true;
-      chrome.runtime.sendMessage({
-        action: "redirect",
-        reason: "Explicit titles detected across page",
-      });
-      setTimeout(resetRedirectProtection, 1500);
-      return;
-    }
-
-    // ----------------------------------
-    // 3. Text-based detection (intent-gated)
-    // ----------------------------------
+    // 3. Adult environment plus explicit content, gated on the page being a post or a
+    // chosen listing.
     if (
-      riskyEnvironment &&
-      inside &&
-      (textScore >= 3 || explicitTitleScore >= 4)
+      riskyEnvironment && textScannable && !onYouTube &&
+      (scores.text >= profile.textScore || scores.title >= profile.titleScore - 2)
     ) {
-      redirectTriggered = true;
-      chrome.runtime.sendMessage({
-        action: "redirect",
-        reason: "Adult environment + explicit content detected",
-      });
-      setTimeout(resetRedirectProtection, 1500);
+      reportVerdict(false, 5);
+      triggerRedirect("Adult environment + explicit content detected");
       return;
     }
 
-    // ----------------------------------
-    // 4. Ignore feeds
-    // ----------------------------------
-    if (isFeedPage(url)) return;
+    reportVerdict(true, riskLevel(scores, profile));
   } catch (error) {
     console.error("CleanTab scan error:", error);
-    // Don't block the page if extension fails
+    // Never let a detection failure break the page.
   }
 }
-
-// Only scan after full page load
-window.addEventListener("load", () => {
-  redirectTriggered = false;
-  debouncedScan();
-});
-
-// Handle SPA navigation (YouTube, Twitter, Reddit, etc.)
-let lastUrl = location.href;
-
-function handleNavigation() {
-  if (location.href !== lastUrl) {
-    lastUrl = location.href;
-    redirectTriggered = false; // Reset for new page
-    setTimeout(scan, 500); // Slight delay for content to load
-  }
-}
-
-// Watch for URL changes in SPAs
-setInterval(handleNavigation, 1000);
-
-// Also listen to popstate for back/forward navigation
-window.addEventListener("popstate", () => {
-  setTimeout(handleNavigation, 300);
-});
-
-// Add debounced scanning
 
 let scanTimeout;
-
-function debouncedScan() {
+function debouncedScan(delay = 300) {
   clearTimeout(scanTimeout);
-  scanTimeout = setTimeout(scan, 300);
+  scanTimeout = setTimeout(scan, delay);
 }
 
-// ── Dwell-based image detection (visual platforms only) ───────────────────────
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
 
+let initStarted = false;
+
+async function init() {
+  if (initStarted) return; // the load listener and the readyState fallback can both fire
+  initStarted = true;
+  await refreshPolicy();
+  scan();
+  if (policy.dwellEnabled) startDwellObserver();
+}
+
+// document_idle frequently runs AFTER the load event has already fired, in which case a
+// bare load listener never runs and the page is never scanned at all. Cover both.
+if (document.readyState === "complete") {
+  init();
+} else {
+  window.addEventListener("load", init, { once: true });
+  // Fallback for pages whose load event never settles (long-polling, stalled subresources).
+  if (document.readyState !== "loading") setTimeout(init, 1500);
+}
+
+// SPA navigation (YouTube, Twitter, Reddit…)
+let lastUrl = location.href;
+
+async function handleNavigation() {
+  if (location.href === lastUrl) return;
+  lastUrl = location.href;
+  redirectTriggered = false;
+  await refreshPolicy(); // allowances and pauses are URL-scoped
+  debouncedScan(500);
+}
+
+setInterval(handleNavigation, 1000);
+window.addEventListener("popstate", () => setTimeout(handleNavigation, 300));
+
+// Re-read policy when settings change so sensitivity and trust take effect without a
+// reload. Content scripts can read storage.local directly; the policy itself still comes
+// from the worker so the session-scoped parts stay in one place.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.enabled || changes.trustedSites || changes.sensitivity ||
+      changes.disableUntil || changes.enableDwellDetection) {
+    refreshPolicy().then(() => debouncedScan(100));
+  }
+});
+
+// ── Cross-origin image encode fallback (plan §8.4.3) ───────────────────────────
+//
+// Some CDNs reject the worker's credential-less fetch. The page already has the bytes,
+// so it re-encodes them through a canvas. Only works for images the page loaded with
+// CORS access; tainted canvases throw and we report failure honestly rather than "safe".
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.action !== "encodeImage") return false;
+  try {
+    const img = [...document.images].find((i) => i.src === msg.src);
+    if (!img || !img.complete || !img.naturalWidth) { sendResponse({ dataUrl: null }); return true; }
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext("2d").drawImage(img, 0, 0);
+    sendResponse({ dataUrl: canvas.toDataURL("image/jpeg", 0.8) });
+  } catch {
+    sendResponse({ dataUrl: null }); // tainted canvas
+  }
+  return true;
+});
+
+// ── Dwell-based image detection ───────────────────────────────────────────────
+
+// Image-first platforms. This used to be an allowlist that decided *whether* dwell
+// scanning ran at all, which meant an explicit image on any other site — a forum, a
+// blog, an imageboard, a tube-site clone — was never looked at. It now only decides how
+// large an image has to be before it is worth classifying: on a feed, a 180px thumbnail
+// is the content; on an ordinary page, images that size are usually chrome and avatars.
 const VISUAL_PLATFORMS = new Set([
-  "pinterest.com", "www.pinterest.com",
-  "reddit.com", "www.reddit.com", "old.reddit.com",
-  "twitter.com", "www.twitter.com", "x.com", "www.x.com",
-  "instagram.com", "www.instagram.com",
-  "tumblr.com", "www.tumblr.com",
+  "pinterest.com", "reddit.com", "twitter.com", "x.com",
+  "instagram.com", "tumblr.com", "imgur.com", "deviantart.com",
+  "flickr.com", "4chan.org", "9gag.com",
 ]);
 
-const DWELL_MS = 2000;       // pause duration before classifying
-const MIN_IMAGE_PX = 180;    // skip avatars and icons
-const CLASSIFY_RATE_MS = 3000; // min gap between classifications per tab
+const DWELL_MS = 2000;
+const MIN_IMAGE_PX = 180;
+const MIN_IMAGE_PX_GENERAL = 260;
+const CLASSIFY_RATE_MS = 3000;
+const OBSERVE_DEBOUNCE_MS = 400;
 
 let isPageScrolling = false;
 let scrollStopTimeout;
@@ -432,12 +313,9 @@ function dispatchImageClassification(src) {
   chrome.runtime.sendMessage({ action: "classifyImage", src }, (response) => {
     dwellClassifyInFlight = false;
     if (chrome.runtime.lastError) return;
-    if (response?.unsafe && extensionEnabled && !redirectTriggered) {
-      redirectTriggered = true;
-      chrome.runtime.sendMessage({ action: "redirect", reason: "Dwelled on flagged image content" });
-      setTimeout(resetRedirectProtection, 1500);
+    if (response?.unsafe && !scanningSuppressed() && !redirectTriggered) {
+      triggerRedirect("Dwelled on flagged image content");
     }
-    // Drain one queued item after rate-limit delay
     if (dwellClassifyQueued) {
       const nextSrc = dwellClassifyQueued;
       dwellClassifyQueued = null;
@@ -451,14 +329,18 @@ function requestImageClassification(src) {
   if (!src || src.startsWith("data:") || src.startsWith("blob:")) return;
   const now = Date.now();
   if (dwellClassifyInFlight || (now - dwellLastClassifyTime) < CLASSIFY_RATE_MS) {
-    dwellClassifyQueued = src; // keep only the latest
+    dwellClassifyQueued = src;
     return;
   }
   dispatchImageClassification(src);
 }
 
 function startDwellObserver() {
-  if (!VISUAL_PLATFORMS.has(location.hostname)) return;
+  // Runs on every site. The cost controls are the dwell delay, the size floor and the
+  // rate limit — not an allowlist of hostnames.
+  const minImagePx = VISUAL_PLATFORMS.has(normalizeDomain(location.hostname))
+    ? MIN_IMAGE_PX
+    : MIN_IMAGE_PX_GENERAL;
 
   const dwellTimers = new WeakMap();
   const clearedImages = new WeakSet();
@@ -470,9 +352,8 @@ function startDwellObserver() {
 
       if (entry.isIntersecting) {
         const tid = setTimeout(() => {
-          // Only fire if user is still — not mid-scroll
-          if (!isPageScrolling && !redirectTriggered && extensionEnabled && img.src) {
-            clearedImages.add(img); // mark so we don't re-queue it
+          if (!isPageScrolling && !redirectTriggered && !scanningSuppressed() && img.src) {
+            clearedImages.add(img);
             requestImageClassification(img.src);
           }
         }, DWELL_MS);
@@ -484,30 +365,47 @@ function startDwellObserver() {
     });
   }, { threshold: 0.5 });
 
-  function observeImages() {
-    document.querySelectorAll("img").forEach((img) => {
-      if (dwellTimers.has(img) || clearedImages.has(img)) return;
-      const check = () => {
-        const w = img.naturalWidth || img.width;
-        const h = img.naturalHeight || img.height;
-        if (w >= MIN_IMAGE_PX || h >= MIN_IMAGE_PX) {
-          intersectionObserver.observe(img);
-        }
-      };
-      if (img.complete) check();
-      else img.addEventListener("load", check, { once: true });
-    });
+  const observed = new WeakSet();
+
+  function observeImage(img) {
+    if (observed.has(img) || clearedImages.has(img)) return;
+    const check = () => {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (w >= minImagePx || h >= minImagePx) {
+        observed.add(img);
+        intersectionObserver.observe(img);
+      }
+    };
+    if (img.complete) check();
+    else img.addEventListener("load", check, { once: true });
   }
 
-  observeImages();
+  document.querySelectorAll("img").forEach(observeImage);
 
-  // Pick up images added by infinite-scroll feeds
-  const mutationObserver = new MutationObserver(observeImages);
+  // The previous version re-ran querySelectorAll("img") over the whole document on every
+  // mutation. On an infinite feed that was the dominant cost of the whole extension.
+  // Only new subtrees are inspected now, and bursts are coalesced.
+  let pending = [];
+  let flushTimer = null;
+
+  function flush() {
+    flushTimer = null;
+    const nodes = pending;
+    pending = [];
+    for (const node of nodes) {
+      if (node.nodeType !== 1) continue;
+      if (node.tagName === "IMG") observeImage(node);
+      else node.querySelectorAll?.("img").forEach(observeImage);
+    }
+  }
+
+  const mutationObserver = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) pending.push(node);
+    }
+    if (pending.length && !flushTimer) flushTimer = setTimeout(flush, OBSERVE_DEBOUNCE_MS);
+  });
+
   mutationObserver.observe(document.body, { childList: true, subtree: true });
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startDwellObserver);
-} else {
-  startDwellObserver();
 }

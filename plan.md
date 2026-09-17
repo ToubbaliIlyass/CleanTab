@@ -516,3 +516,439 @@ Outside this list, dwell scanning is off. Cheap text scoring stays as the global
 
 ### 8.8 Execution
 This is a meaningful feature — separate phase, separate commit, possibly a feature flag (`enableDwellDetection` in storage, default off until tuned). Land behind the flag, dogfood on Pinterest for a week, then default on.
+
+---
+
+## 9. Improvement plan (queued 2026-09-16)
+
+Written after a full audit of the shipped code. Phases 13–20 continue the numbering from §3.
+
+### 9.0 The ordering argument
+
+The audit found that the appeal flow classifies CleanTab's own redirect page instead of the
+flagged page (`background.js:432`), that approved appeals don't take effect on `www.` hosts
+(`background.js:419` vs `content.js:297`), and that "clean minutes" counts any active tab
+regardless of what's on it (`background.js:325`).
+
+That matters for sequencing: **the ring, the heatmap, the badge, the goal calibration and
+every popup stat are all views onto a number that isn't measuring what its label claims.**
+Polishing the popup before fixing the metric would be building a nicer window onto the
+same wrong room. So Phase 13 and 14 are prerequisites, not housekeeping.
+
+The popup work (17–18) is where most of the *felt* improvement lands, and it's blocked on
+one insight: **the popup currently has no idea what tab it's open on.** It shows lifetime
+trophies. It should show a control surface for the page in front of the user.
+
+---
+
+### Phase 13 — Correctness foundation
+
+Blocking. Nothing below is worth building until detection means something.
+
+**Changes**
+- `background.js` appeal handler: before classifying, navigate the tab back to the original
+  URL, wait for `tabs.onUpdated` → `complete`, *then* `captureVisibleTab`. If the
+  verdict is unsafe, redirect again. Without this the classifier never sees the page it is
+  judging, and every reason string it prints is false.
+- New `shared/domains.js` with a single `normalizeDomain(hostname)` (lowercase, strip
+  leading `www.` only, anchored). Use it on **both** the write side (`addSafeDomain`) and
+  the read side (`content.js` safe-domain check). Currently they disagree, so an approved
+  appeal sends the user into a redirect loop.
+- Bundle the NSFW.js model weights under `vendor/nsfwjs/model/` and pass
+  `chrome.runtime.getURL("vendor/nsfwjs/model/model.json")` to `nsfwjs.load()`.
+  The bare `load()` fetches from a CloudFront CDN — the "self-contained bundle" comments in
+  `offscreen/offscreen.js:5` and `vendor/SETUP.md` are wrong, and the README's
+  "no external APIs" claim is currently false.
+- Self-host Bricolage Grotesque + DM Sans under `Assets/fonts/`. Three pages hit
+  `fonts.googleapis.com` today, so every block event pings Google and the redirect page
+  renders in fallback fonts offline.
+- Stop putting the blocked URL in the address bar. `background.js:260` writes the full
+  original URL into `?original=`, which lands it in the omnibox, history and session
+  restore. Store it in `chrome.storage.session` keyed by tab ID; pass an opaque token.
+- `content.js`: run the first scan unconditionally when `document.readyState === "complete"`,
+  not only from the `load` listener. At `document_idle` the load event has often already
+  fired, so on those pages the initial scan never happens at all.
+- Resolve `shared/`: it is entirely dead code. Load it via `importScripts` in the service
+  worker and as content-script files in the manifest, or delete it. Three divergent copies
+  of the keyword list (`background.js:1`, `content.js:54`, `shared/keywords.js`) already
+  disagree about `nude`.
+- Drop unused `scripting` and `activeTab` from `manifest.json`.
+
+**Acceptance**
+- Appealing a genuinely NSFW page is denied with a percentage derived from that page.
+- Appealing a falsely-flagged page on a `www.` host returns the user there and keeps them
+  there.
+- Detection works with the network off.
+- One keyword list exists in the repo.
+
+---
+
+### Phase 14 — Make the metric true
+
+**The problem.** `tickCleanMinute` increments for any active, non-idle, non-redirect tab.
+It is a browsing-time counter labelled as a virtue.
+
+**Changes**
+- Content script reports a verdict after each scan:
+  `{action: "tabVerdict", clean: bool, score: n}` → background stores it in
+  `chrome.storage.session` under the tab ID.
+- `tickCleanMinute` increments only when the active tab has a recent (< 2 min) `clean: true`
+  verdict. No verdict (never scanned, restricted page, `chrome://`) counts as neutral —
+  it does not increment, and it does not break the ring.
+- Relabel throughout: "Clean browsing" → **"Clean minutes — time browsing with nothing
+  flagged."** Say what it counts.
+- Reset the badge icon on rollover and when protection is paused (`updateBadgeArc`
+  currently paints once and leaves the stale arc up forever).
+
+**Acceptance**
+- Sitting on a flagged-but-appealed page does not accrue clean minutes.
+- Closing the laptop for an hour changes nothing (already true; keep it true).
+- The number in the ring can be explained in one sentence without hedging.
+
+---
+
+### Phase 15 — Scoped unblocking (replaces the appeal)
+
+**The problem.** The only escape hatch is a permanent, invisible, domain-wide whitelist with
+no UI to review or revoke it. That is the heaviest possible response to "this was a false
+positive on one page."
+
+**Changes**
+- Three outcomes on the redirect page instead of one button:
+  1. **"Let me through once"** — allows the exact URL for 10 minutes. No classifier, no
+     permanent state. This is the common case and should be cheap.
+  2. **"This site is fine"** — runs the real classifier (Phase 13). On safe, adds a
+     *reviewable* trust entry (Phase 18). On unsafe, denies with honest probabilities.
+  3. Nothing — close the tab.
+- Trust entries become records, not bare strings:
+  `{ domain, addedAt, source: "appeal" | "manual", expiresAt: null }`.
+  Migrate existing `safeDomains` strings in a `v1_to_v2` migration.
+- Rate-limit outcome 1 to 3 per domain per day, then it escalates to outcome 2.
+  `cooldownUntil` already exists in the schema and is never read; wire it here.
+
+**Acceptance**
+- A one-off false positive costs one click and leaves no permanent state.
+- Every permanent trust decision is visible in the popup and revocable.
+
+---
+
+### Phase 16 — Sensitivity as a user control
+
+**The problem.** Every threshold is a hardcoded magic number (`urlScore >= 5`,
+`explicitTitleScore >= 6`, `textScore >= 3`, `unsafe > 0.6`). A user who finds CleanTab too
+twitchy or too loose has exactly one lever: turn it off entirely. That is the most likely
+reason someone uninstalls.
+
+**Changes**
+- New `shared/thresholds.js` exporting three named profiles:
+
+  | | Strict | Balanced (default) | Lenient |
+  |---|---|---|---|
+  | `urlScore` | 3 | 5 | 8 |
+  | `titleScore` | 4 | 6 | 9 |
+  | `textScore` | 2 | 3 | 5 |
+  | NSFW.js unsafe | 0.45 | 0.6 | 0.75 |
+  | Dwell scanning | on | on | off |
+
+- `sensitivity: "balanced"` in the schema; content script and background read the profile
+  rather than literals.
+- `enableDwellDetection` flag, defaulting **off** until tuned — §8.8 already called for this
+  and it shipped on by default instead.
+
+**Acceptance**
+- No comparison against a numeric literal remains in the detection path.
+- Switching profiles takes effect on the next scan without a reload.
+
+---
+
+### Phase 17 — Popup: the "Now" surface
+
+**The diagnosis.** The popup today is a trophy case: a ring, three lifetime counters, a
+heatmap. Nothing on it is actionable, nothing changes between openings, and — the core
+miss — **it never mentions the tab you're looking at.** You open it on Reddit and it tells
+you a percentage. There is no reason to open it twice.
+
+**The reframe.** The popup's first screen should answer *"what is CleanTab doing on this
+page right now, and what can I do about it?"* Progress is the second question, not the first.
+
+**Target layout (380×560, "Now" tab):**
+
+```
+┌────────────────────────────────────┐
+│ CleanTab                ● Active   │
+├────────────────────────────────────┤
+│ ┌────────────────────────────────┐ │
+│ │ ◐ reddit.com        Protected  │ │  ← new: current-tab card
+│ │ Scanned 2s ago · risk 2 / 5    │ │
+│ │ [ Trust site ]  [ Pause 15m ]  │ │
+│ └────────────────────────────────┘ │
+│                                    │
+│            ╭────────╮              │
+│           │   68%    │             │  ring, 140px (was 180)
+│            ╰────────╯              │
+│         38 min to close            │
+│                                    │
+│   12          3           47       │
+│ Closed      Blocks    Reflections  │
+│  days       today                  │
+│                                    │
+│ ┌────────────────────────────────┐ │
+│ │ Most common trigger: Bored 41% │ │  ← one live insight, not
+│ └────────────────────────────────┘ │     buried behind a tab
+├────────────────────────────────────┤
+│  Now   Progress   Sites   Guard    │
+└────────────────────────────────────┘
+```
+
+**Changes**
+- Query the active tab on open; render hostname + favicon + one of four states:
+  **Protected** / **Trusted** (with "stop trusting") / **Paused here** / **Not scanned**
+  (`chrome://`, PDF viewer, restricted page — say so rather than implying coverage).
+- Show the last scan's risk score and age. Detection is completely opaque today; this is
+  the cheapest possible way to make the product feel alive and honest.
+- **Pause for this site** (15 min / 1 h / today) as a middle option between "endure it" and
+  "disable everything." Site-scoped pause needs no passphrase; global disable keeps the
+  full friction. Right now every pause is nuclear, which trains users to nuke.
+- Shrink the ring to 140px to make room. It is currently 32% of the popup's height for a
+  number that changes once a minute.
+- Surface the top trigger inline once ≥10 reflections exist, instead of leaving the
+  Progress tab's insight section hidden behind an empty state most users never clear.
+
+**Acceptance**
+- Opening the popup on three different sites produces three visibly different screens.
+- A user can tell, without leaving the popup, whether the current page is being scanned.
+
+---
+
+### Phase 18 — Popup: "Sites" tab
+
+**The problem.** `safeDomains` is a write-only list. Nothing in the UI shows it, and nothing
+can remove from it. Combined with the appeal bug in Phase 13, a user could accumulate a
+dozen permanent bypasses without ever seeing one.
+
+**Changes**
+- New fourth tab listing trusted sites: domain, when added, how (appeal vs manual), and a
+  revoke button. Empty state explains what lands here.
+- "Add a site manually" input, so trusting a site doesn't require getting blocked first.
+- Below it: **recently flagged** (last 10 blocks, from `reflections[].domain` plus a new
+  `blocks[]` ring buffer) with a one-tap "this keeps being wrong → trust it" and a one-tap
+  "this is right → never ask again".
+- Move Export/Import from Guard into this tab's footer; Guard becomes purely the
+  protection toggle plus the sensitivity selector from Phase 16.
+
+**Acceptance**
+- Every permanent trust decision the extension has ever made is visible in one list.
+- Revoking takes effect on the next scan without a reload.
+
+---
+
+### Phase 19 — Honest failure states
+
+**The problem.** Every failure path resolves to "safe" and says nothing. Model can't load →
+`null` → appeal falls back to keyword score. Image fetch 403s on an Instagram CDN → `null` →
+treated as clean. Offscreen document dies → silent. The user's experience of a broken
+detector is identical to a working one that found nothing.
+
+**Changes**
+- Track `detectionHealth` in `chrome.storage.session`: model loaded, last classification
+  result, consecutive fetch failures.
+- Surface it in the popup header badge: **Active** / **Active (text only)** when the model
+  is unavailable / **Paused**. Never claim image analysis that isn't running.
+- Implement the canvas fallback §8.4.3 already specified: when background `fetch(src)` fails,
+  ask the content script to draw the `<img>` to an `OffscreenCanvas` and ship the blob.
+  Cross-origin CDN blocks are the common case on exactly the platforms dwell targets.
+- Debounce the `MutationObserver` in `startDwellObserver` (`content.js:505`) and scan only
+  `addedNodes`. It currently re-runs `querySelectorAll("img")` over the whole document on
+  every mutation — on an infinite feed that is the dominant CPU cost, and §8.5 flagged the
+  battery risk without the mitigation landing.
+
+**Acceptance**
+- Offline, the popup says "text only" rather than "Active".
+- A 10-minute Pinterest scroll shows no sustained main-thread cost from the observer.
+
+---
+
+### Phase 20 — Onboarding v2
+
+**The problem.** Onboarding asks exactly one question — hours per day — and uses it to set a
+goal for a metric that (pre-Phase 14) doesn't measure what it says. It never explains what
+CleanTab does, what gets blocked, or that a screenshot is taken during appeals.
+
+**Changes**
+- Three screens: *what this does* (one sentence + the honest limits) → *sensitivity*
+  (Phase 16 profiles, with an example of what each would block) → *your daily estimate*
+  (existing chips).
+- Disclose the screenshot-on-appeal behavior explicitly. It is defensible and local, but it
+  should not be a surprise discovered in the source.
+- Offer "import a backup" on the first screen for reinstalls.
+
+---
+
+### 9.1 Open decisions
+
+1. **The ring rewards more browsing.** A user who shuts the laptop at 20% has a worse-looking
+   day than one who scrolled cleanly for four hours. That is inverted for a focus product.
+   Options: (a) keep it, leaning on `recalibrateGoal`'s median anchoring so the goal tracks
+   what the user already does; (b) cap the ring at the goal and show overage separately;
+   (c) reframe the ring as "clean share of browsing time" — a ratio, not a total, which a
+   short clean day closes just as well as a long one. **Leaning (c)** — it is the only one
+   where closing the laptop isn't a penalty. Needs a call before Phase 14 locks the schema.
+2. **Site-scoped pause vs. passphrase.** Making per-site pause frictionless may become the
+   default bypass. Mitigation: cap at 3 site-pauses per day, then require the passphrase.
+3. **Dwell default.** Ship Phase 16 with dwell off and let users opt in, or keep it on for
+   the visual platforms? Off is more honest until §8.6's acceptance criteria are actually
+   measured.
+4. **Fourth tab vs. overflow.** Four tabs at 380px is tight. Alternative: fold Guard into a
+   gear icon in the header and keep three tabs.
+
+### 9.2 Non-goals for this round
+
+- ~~Tests and CI~~ — **done, see §9.5.** Kept out of the feature commits and landed as its
+  own layer, which is what let it surface two real bugs instead of ratifying the code.
+- Replacing NSFW.js with a better model.
+- Cross-device sync.
+- Firefox port.
+
+### 9.3 Suggested execution order
+
+Phase 13 → 14 → 17 → 18 → 16 → 15 → 19 → 20.
+
+13 and 14 are prerequisites. 17 and 18 are next because they deliver the most visible
+improvement per hour and make everything else inspectable. 16 before 15 because scoped
+unblocking wants configurable thresholds to be meaningful. 19 and 20 are the honesty pass
+once the machinery is real.
+
+---
+
+### 9.4 Build log — 2026-09-16
+
+Phases 13–20 implemented in one pass. What landed, and where it diverged from the plan above.
+
+**Phase 13 — correctness.** Appeal rewritten (see deviation below). `shared/domains.js` now owns
+`normalizeDomain()` and both the write and read sides call it. Model weights vendored to
+`vendor/nsfwjs/model/` (2.7 MB, MobileNetV2) and passed explicitly to `nsfwjs.load()`. Fonts
+self-hosted to `Assets/fonts/` (192 K after deduping the variable-font shards — Bricolage's
+600/700/800 faces are byte-identical). Blocked URLs moved from the query string to
+`chrome.storage.session` keyed by tab. Content script scans when `readyState === "complete"`
+rather than relying on a `load` listener registered too late. `shared/` is live: loaded via
+`importScripts` in the worker and via the manifest for content scripts. `scripting` and
+`activeTab` dropped from the manifest.
+
+**Phase 14 — the metric.** Content script reports `{clean, score}` per scan into session
+storage; `tickMinute` reads the active tab's verdict. Both `cleanMinutes` and
+`browsedMinutes` are recorded. A tab that could not be scanned advances neither counter.
+
+**Ring model — resolved.** §9.1's open question was settled as option (c) plus context:
+the ring fills on **clean share** (`cleanMinutes / browsedMinutes`), and the minute totals
+sit underneath as context rather than as the goal. `MIN_BROWSED_FOR_CLOSE = 20` stops one
+clean minute reading as a closed day. `cleanShare()` and `ringIsClosed()` live in
+`shared/schema.js` so the ring, the rollover and the heatmap cannot drift apart.
+`goalMinutes` is retained — it is still the onboarding estimate — but no longer gates the ring.
+
+**Phase 15 — scoped unblocking.** Redirect page now offers "Let me through once"
+(URL-scoped, 10 min, session-only, no permanent state) and "This site is fine" (real check,
+permanent trust record). `trustedSites` records replace `safeDomains` strings via
+`v1_to_v2`. Legacy entries are preserved but tagged `appeal-legacy` and flagged for review
+in the Sites tab, since the flow that created them approved almost everything.
+
+**Phase 16 — sensitivity.** `shared/thresholds.js` holds three profiles. No numeric literal
+remains in the detection path. Selector on the Guard tab and in onboarding.
+
+**Phases 17 / 18 — popup.** Now / Progress / Sites / Guard. Current-site card with four
+honest states, risk score and scan age, per-site pause (15 min / 1 h / rest of day), trust
+toggle. Ring shrunk 180 → 140 px. Top trigger surfaced inline. Sites tab lists every trust
+entry with source and age, plus recent blocks with one-tap trust, and a manual add field.
+Heatmap recoloured by clean share; days with no tracked browsing render blank rather than dark.
+
+**Phase 19 — health.** `detectionHealth` in session storage; header badge reads **Active** /
+**Text only** / **Paused** and never claims image analysis that isn't running. Canvas
+fallback for CDN-blocked fetches implemented (§8.4.3). `MutationObserver` debounced to
+400 ms and scoped to `addedNodes`. Dwell scanning defaults **off** (§8.8's flag, finally).
+
+**Phase 20 — onboarding.** Three steps: what it does (including "it will get things wrong")
+→ sensitivity → daily estimate. Restore-a-backup on step one.
+
+#### Deviation: the appeal reviews page images, not a screenshot
+
+Phase 13 specified navigating the tab back to the original URL and screenshotting it. Two
+problems surfaced during the build:
+
+1. The redirect page lives **in the tab being navigated**, so it is destroyed mid-check and
+   `sendResponse` never arrives. The flow would have to bounce back with a query param.
+2. More importantly, it renders possibly-explicit content to the user in order to decide
+   whether they should be allowed to see it. Self-defeating for this product.
+
+Instead `reviewPage()` fetches the page server-side, extracts up to 8 image URLs (`<img src>`
+plus `og:image`), and classifies those. The user never sees the page unless it clears.
+
+The honest tradeoff: a client-rendered page exposes few images to a plain fetch. That
+returns **inconclusive** — a third outcome that keeps the block and says so — rather than a
+false clear, which was the old flow's failure mode. "Let me through once" covers the case.
+
+#### Verification
+
+40 assertions across domain normalization, keyword false positives, sensitivity profiles,
+clean-share maths, the v1→v2 migration and a storage round trip — all passing. Run against
+the real `shared/` modules in a VM with a stubbed `chrome.storage`. Static checks confirm no
+redeclarations across any of the four script bundles, no dangling references, and that every
+manifest and HTML path resolves.
+
+The harness itself is **not** committed — §9.2 kept tests out of this round, and it belongs
+in its own commit. It remains the top unbuilt item: the keyword scorer is still the one place
+a silent regression is invisible until a user gets wrongly blocked.
+
+#### Not verified
+
+Nothing here has been loaded in Chrome. The service worker, the offscreen document, the
+MV3 message routing and every rendered layout are unexercised. Load unpacked and walk:
+first-run onboarding → a real block → both escape hatches → the four popup tabs.
+
+---
+
+### 9.5 Test suite — 2026-09-16
+
+§9.2 listed tests as a non-goal for the feature round and §7.4's "detection regex test
+harness" had been queued since May. Both are now done, as their own layer.
+
+**`tests/` — 261 assertions, 11 suites, zero dependencies.** `node tests/run.mjs`.
+`shared/` modules are evaluated into a fresh V8 context per suite with a stubbed
+`chrome.storage` (async callbacks, like the real API) and a frozen clock.
+
+**`tests/MANUAL.md` — 171 checkpoints** across 17 groups, for everything that only exists
+inside Chrome: worker lifecycle, offscreen documents, TF.js, message routing, rendering,
+performance and the privacy audit. Includes a 10-minute smoke subset and a ranked list of
+where the build is most likely to break first.
+
+#### Refactor the tests forced
+
+`getURLScore`, `riskLevel`, `PASSTHROUGH_PARAMS` moved from `content.js` into
+`shared/scoring.js`; page-review parsing and verdict logic moved from `background.js` into
+`shared/review.js`. Both were unreachable from any test while they sat inside a content
+script and a service worker. Writing the tests is what surfaced that.
+
+#### Two real bugs the tests caught
+
+1. **The passthrough-param skip list was being bypassed.** `getURLScore` called
+   `getKeywordScore` on the entire raw URL *first*, query string included, and only then
+   looped the params to skip `?continue=` and friends. A Google sign-in URL carrying
+   `?continue=https://site/porn` scored on "porn" from the full-string pass before the skip
+   list ever applied. The Phase 1 fix had looked correct for a year and never worked.
+   Now the query string is excluded from the base score and only non-passthrough params are
+   added back.
+
+2. **Unrendered template placeholders were queued for fetching.** `{{ image }}` in
+   server-rendered HTML resolves as a perfectly valid relative URL, so the appeal's image
+   parser treated it as an image to download.
+
+#### And one I introduced
+
+The popup's site card fetched `google.com/s2/favicons` — a remote request keyed by the exact
+domain you are looking at, added in the same pass that removed every other remote request
+and wrote "no external requests" into the README. Replaced with a local letter mark. The
+`static` suite now fails the build if any code assigns a literal `https://` URL to `.src`
+or passes one to `fetch`.
+
+#### Still not covered
+
+No end-to-end automation. Puppeteer with `--load-extension` would cover the install,
+pause-page, popup and Sites groups cheaply and is the obvious next investment.

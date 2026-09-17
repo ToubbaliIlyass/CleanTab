@@ -4,8 +4,10 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CleanTab — Setup</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="../Assets/icon16.png"/>
+  <link rel="icon" type="image/png" sizes="48x48" href="../Assets/icon48.png"/>
+  <link rel="icon" type="image/png" sizes="128x128" href="../Assets/icon128.png"/>
+  <link rel="stylesheet" href="../Assets/fonts/fonts.css"/>
   <link rel="stylesheet" href="onboarding.css"/>
 </head>
 <body>
@@ -13,13 +15,116 @@
 
   <nav class="topbar">
     <div class="wordmark"><span class="accent">Clean</span>Tab</div>
+    <div class="step-dots">
+      <span class="dot active" data-dot="0"></span>
+      <span class="dot" data-dot="1"></span>
+      <span class="dot" data-dot="2"></span>
+      <span class="dot" data-dot="3"></span>
+    </div>
   </nav>
 
-  <main class="main">
+  <!-- ── STEP 1: what this does ── -->
+  <main class="main step is-active" data-step="0">
     <div class="hero">
-      <div class="step-chip">Setup</div>
+      <div class="step-chip">What it does</div>
+      <h1 class="headline">It reads the page,<br/>not your history.</h1>
+      <p class="sub">
+        CleanTab scores the text and links of pages you open. When a page looks explicit,
+        it swaps the tab for a pause screen and asks what's actually going on.
+      </p>
+    </div>
+
+    <div class="question-block">
+      <p class="question">Worth knowing before you start</p>
+      <ul class="fact-list">
+        <li><strong>It runs entirely on your device.</strong> No account, no server, no analytics. Nothing leaves your machine.</li>
+        <li><strong>It will get things wrong.</strong> Keyword scoring misfires on health, art and news writing. Every block has a one-click way through, and you can trust a site permanently.</li>
+        <li><strong>Optional image scanning.</strong> If you turn it on, pictures you linger on in feeds get classified locally. It costs battery, so it starts off.</li>
+      </ul>
+    </div>
+
+      <label class="ack" for="ackBox">
+        <input type="checkbox" id="ackBox"/>
+        <span>I understand CleanTab will sometimes block the wrong page, and that I can
+          get through any block myself.</span>
+      </label>
+    </div>
+
+    <div class="footer-row">
+      <button class="ghost-btn" id="importLink">Restore a backup</button>
+      <input type="file" id="importFile" accept=".json" hidden/>
+      <button class="done-btn" data-next="1" data-gate="ack" disabled>Next →</button>
+    </div>
+  </main>
+
+  <!-- ── STEP 2: sensitivity ── -->
+  <main class="main step" data-step="1">
+    <div class="hero">
+      <div class="step-chip">Sensitivity</div>
+      <h1 class="headline">How much signal<br/>before it blocks?</h1>
+      <p class="sub">Pick one to continue. You can change it any time from the Guard tab.</p>
+    </div>
+
+    <div class="question-block">
+      <div class="chips vertical" id="sensChips"></div>
+      <p class="hint" id="sensHint">Most people should start on Balanced.</p>
+    </div>
+
+    <div class="footer-row">
+      <button class="ghost-btn" data-next="0">← Back</button>
+      <button class="done-btn" data-next="2" data-gate="sens" disabled>Next →</button>
+    </div>
+  </main>
+
+  <!-- ── STEP 3: incognito ── -->
+  <main class="main step" data-step="2">
+    <div class="hero">
+      <div class="step-chip">Incognito</div>
+      <h1 class="headline">The window that<br/>needs it most.</h1>
+      <p class="sub">
+        Chrome disables every extension in incognito by default — including this one. Until
+        you allow it, an incognito window has no protection at all.
+      </p>
+    </div>
+
+    <div class="question-block">
+      <p class="question">Two steps, and this screen will confirm it worked</p>
+      <ol class="fact-list numbered">
+        <li>Open the extension's settings page with the button below.</li>
+        <li>Turn on <strong>Allow in Incognito</strong>, then come back to this tab.</li>
+      </ol>
+
+      <div class="incognito-actions">
+        <button class="chip" id="openSettingsBtn">Open extension settings →</button>
+        <button class="chip" id="recheckBtn">Check again</button>
+      </div>
+
+      <div class="status" id="incognitoStatus" data-state="pending">
+        <span class="status-dot"></span>
+        <span class="status-text" id="incognitoStatusText">Not allowed in incognito yet.</span>
+      </div>
+
+      <p class="hint">
+        CleanTab uses split incognito, so an incognito session keeps its own pauses and
+        never writes incognito browsing into your history or your ring.
+      </p>
+    </div>
+
+    <div class="footer-row">
+      <button class="ghost-btn" data-next="1">← Back</button>
+      <div class="footer-actions">
+        <button class="ghost-btn" id="skipIncognito">Skip — I don't use incognito</button>
+        <button class="done-btn" data-next="3" data-gate="incognito" disabled>Next →</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── STEP 4: daily estimate ── -->
+  <main class="main step" data-step="3">
+    <div class="hero">
+      <div class="step-chip">Your day</div>
       <h1 class="headline">One question<br/>before we start.</h1>
-      <p class="sub">This sets your daily focus goal. You can always adjust later.</p>
+      <p class="sub">This sets the browsing floor your ring needs before a day counts.</p>
     </div>
 
     <div class="question-block">
@@ -34,19 +139,27 @@
       </div>
 
       <div class="goal-preview" id="goalPreview" style="opacity:0">
-        <span class="goal-label">Your daily ring goal</span>
-        <span class="goal-val" id="goalVal">—</span>
-        <span class="goal-unit">min of clean browsing</span>
+        <span class="goal-label">Your ring closes at</span>
+        <span class="goal-val" id="goalVal">95</span>
+        <span class="goal-unit">% clean browsing</span>
       </div>
     </div>
 
     <div class="footer-row">
-      <p class="privacy">Nothing leaves your device.</p>
+      <button class="ghost-btn" data-next="2">← Back</button>
       <button class="done-btn" id="doneBtn" disabled>Get started →</button>
     </div>
   </main>
 
 </div>
+
+<script src="../shared/dates.js"></script>
+<script src="../shared/domains.js"></script>
+<script src="../shared/thresholds.js"></script>
+<script src="../shared/schema.js"></script>
+<script src="../shared/migrations/v0_to_v1.js"></script>
+<script src="../shared/migrations/v1_to_v2.js"></script>
+<script src="../shared/storage.js"></script>
 <script src="onboarding.js"></script>
 </body>
 </html>
