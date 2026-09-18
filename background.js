@@ -25,8 +25,6 @@ chrome.runtime.onInstalled.addListener((details) => {
   bootstrap().then(() => {
     if (details.reason === "install") {
       chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/onboarding.html") });
-    } else {
-      resumeOnboardingIfInterrupted();
     }
     handleDailyRollover();
     checkDisableTimer();
@@ -35,7 +33,6 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(() => {
   bootstrap().then(() => {
-    resumeOnboardingIfInterrupted();
     handleDailyRollover();
     checkDisableTimer();
   });
@@ -44,6 +41,12 @@ chrome.runtime.onStartup.addListener(() => {
 // Granting incognito access reloads the extension, which can close the onboarding tab
 // outright — on the very step that asks the user to go and grant it. The page saves a
 // draft before sending them there; if it is gone when we come back, reopen it.
+//
+// This runs at top level, NOT from onInstalled or onStartup. An extension reload fires
+// neither of those — onInstalled is install/update, onStartup is browser launch — so
+// hanging it off them meant the tab never came back, which was the whole point. Every
+// service worker start reaches this line, and the guards below make it cheap and
+// idempotent.
 async function resumeOnboardingIfInterrupted() {
   try {
     const data = await storageGet(["onboardingCompleted", "onboardingDraft"]);
@@ -527,3 +530,6 @@ async function reviewPage(pageUrl, profile) {
     return { verdict: "inconclusive", checked: 0, worst: 0 };
   }
 }
+
+// Runs on every service worker start, including the one caused by an extension reload.
+resumeOnboardingIfInterrupted();
