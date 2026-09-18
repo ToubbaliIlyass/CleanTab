@@ -25,6 +25,8 @@ chrome.runtime.onInstalled.addListener((details) => {
   bootstrap().then(() => {
     if (details.reason === "install") {
       chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/onboarding.html") });
+    } else {
+      resumeOnboardingIfInterrupted();
     }
     handleDailyRollover();
     checkDisableTimer();
@@ -33,10 +35,30 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(() => {
   bootstrap().then(() => {
+    resumeOnboardingIfInterrupted();
     handleDailyRollover();
     checkDisableTimer();
   });
 });
+
+// Granting incognito access reloads the extension, which can close the onboarding tab
+// outright — on the very step that asks the user to go and grant it. The page saves a
+// draft before sending them there; if it is gone when we come back, reopen it.
+async function resumeOnboardingIfInterrupted() {
+  try {
+    const data = await storageGet(["onboardingCompleted", "onboardingDraft"]);
+    if (data.onboardingCompleted) return;
+    // Only the interrupted case. Someone who simply closed the tab is left alone.
+    if (!data.onboardingDraft?.resumePending) return;
+
+    const url = chrome.runtime.getURL("onboarding/onboarding.html");
+    const open = await chrome.tabs.query({ url });
+    if (open.length) return;
+    chrome.tabs.create({ url });
+  } catch {
+    // Never let this break startup.
+  }
+}
 
 chrome.alarms.create("dailyRollover", { periodInMinutes: 30 });
 chrome.alarms.create("minuteTick", { periodInMinutes: 1 });

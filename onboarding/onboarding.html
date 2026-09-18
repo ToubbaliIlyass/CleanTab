@@ -162,21 +162,6 @@
               friction as you&apos;ll actually keep.
             </p>
 
-            <!-- Guardian-only: the uninstall problem, which no in-extension option solves -->
-            <div class="option-list" id="guardianLock" style="display:none">
-              <div class="notice">
-                <p class="notice-title">The off switch is only half of it</p>
-                <p class="notice-body">
-                  An extension can&apos;t stop its own uninstall — that takes an admin
-                  policy. Our generator writes the file for you and closes the bypasses:
-                  Incognito, guest profiles, developer tools.
-                </p>
-                <button class="link-btn" id="openDeploy">Open the setup guide →</button>
-                <p class="notice-foot">Opens in a new tab. Come back and this page checks whether it took.</p>
-              </div>
-
-            </div>
-
             <!-- Shown on BOTH paths. A parent holding a passphrase their child does not
                  know is the same mechanism as an accountability partner. -->
             <div class="option-list" id="sharedLock">
@@ -232,7 +217,16 @@
                 <span class="lock-name">Admin policy</span>
                 <span class="lock-state">Off</span>
               </div>
-              <button class="link-btn small" id="recheckPolicy" style="display:none">Check for a policy again</button>
+              <div class="policy-note" id="guardianLock" style="display:none">
+                <p class="policy-body">
+                  An extension can&apos;t stop its own uninstall — that needs an admin
+                  policy. The generator writes the file and closes the bypasses too.
+                </p>
+                <div class="policy-actions">
+                  <button class="link-btn" id="openDeploy">Open the setup guide →</button>
+                  <button class="link-btn quiet" id="recheckPolicy">Check again</button>
+                </div>
+              </div>
               <p class="lock-foot" id="lockFoot">Getting past one wrong block stays one click, whatever you turn on here.</p>
             </div>
           </div>
@@ -267,6 +261,7 @@
               <span class="status-dot"></span>
               <span id="incognitoStatusText">Not allowed in Incognito yet.</span>
             </div>
+            <p class="aside">Chrome restarts the extension when this setting changes, so this page may reload. Your answers are saved — you&apos;ll come back to this step.</p>
             <button class="ghost-btn" id="skipIncognito">Skip — I don&apos;t use Incognito</button>
           </div>
 

@@ -490,6 +490,13 @@ html, body {
 
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
 
+.aside {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text3);
+  max-width: 44ch;
+}
+
 /* ── Mock visuals ───────────────────────────────────────────────────── */
 
 .mock {
@@ -688,6 +695,24 @@ html, body {
 .lock-name { flex: 1; font-weight: 700; color: var(--text); }
 .lock-state { font-size: 11px; color: var(--text3); }
 .lock-layer.on .lock-state { color: var(--accent); font-weight: 700; }
+
+/* The admin-policy explanation, sitting with the admin-policy row. It used to be a
+ * separate block above the checkboxes in the copy column, which was the single biggest
+ * contributor to that step overflowing on the guardian path. */
+.policy-note {
+  margin-top: 2px;
+  padding: 11px 12px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.policy-body { font-size: 11.5px; line-height: 1.5; color: var(--text2); }
+.policy-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.link-btn.quiet { color: var(--text3); font-weight: 500; }
+.link-btn.quiet:hover { color: var(--accent); }
 
 .lock-foot {
   margin-top: 6px;

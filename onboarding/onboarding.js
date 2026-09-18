@@ -37,6 +37,88 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let index = 0;
 
+  // ── Draft persistence ──────────────────────────────────────────────────────
+  //
+  // Toggling "Allow in Incognito" makes Chrome RELOAD the extension, which tears down
+  // this page — you came back to a fresh step 1 with every answer gone, on the one step
+  // that tells you to go and do exactly that. Progress is written on every change and
+  // restored on load, so a reload costs nothing.
+  //
+  // The partner passphrase is stored as its hash, never as the phrase, same as
+  // everywhere else.
+
+  const DRAFT_KEY = "onboardingDraft";
+  let draftTimer = null;
+
+  function saveDraft(extra = {}) {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      storageSet({ [DRAFT_KEY]: { ...state, index, ...extra } }).catch(() => {});
+    }, 120);
+  }
+
+  async function restoreDraft() {
+    let draft;
+    try {
+      ({ [DRAFT_KEY]: draft } = await storageGet([DRAFT_KEY]));
+    } catch {
+      return false;
+    }
+    if (!draft || typeof draft.index !== "number") return false;
+
+    Object.assign(state, {
+      acknowledged: Boolean(draft.acknowledged),
+      mode: draft.mode || null,
+      sensitivity: draft.sensitivity || null,
+      partnerEnabled: Boolean(draft.partnerEnabled),
+      partnerHash: draft.partnerHash || null,
+      partnerLabel: draft.partnerLabel || null,
+      windowEnabled: Boolean(draft.windowEnabled),
+      windowStart: Number.isFinite(draft.windowStart) ? draft.windowStart : 22,
+      windowEnd: Number.isFinite(draft.windowEnd) ? draft.windowEnd : 6,
+      dwell: Boolean(draft.dwell),
+      incognitoResolved: Boolean(draft.incognitoResolved),
+      hours: draft.hours ?? null,
+    });
+
+    // Reflect the restored state in the controls.
+    el("ackBox").checked = state.acknowledged;
+    if (state.mode) {
+      document.querySelectorAll("#modePicker .pick").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.mode === state.mode));
+      applyMode();
+    }
+    if (state.sensitivity) {
+      sensPicker.querySelectorAll(".pick").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.sens === state.sensitivity));
+      paintMeter(state.sensitivity);
+    }
+    el("optStrictKid").checked = state.dwell;
+    el("optPartner").checked = state.partnerEnabled;
+    el("partnerPanel").style.display = state.partnerEnabled ? "" : "none";
+    if (state.partnerHash) {
+      // The phrase itself was never stored, so say so rather than showing empty fields
+      // that look like nothing was saved.
+      el("partnerError").style.display = "";
+      el("partnerError").style.color = "var(--text2)";
+      el("partnerError").textContent = state.partnerLabel
+        ? `${state.partnerLabel}'s passphrase is saved. Retype both fields to change it.`
+        : "Passphrase saved. Retype both fields to change it.";
+    }
+    el("optWindow").checked = state.windowEnabled;
+    el("winStart").value = String(state.windowStart);
+    el("winEnd").value = String(state.windowEnd);
+    if (state.hours !== null) {
+      document.querySelectorAll("#hoursPicker .pick").forEach((b) =>
+        b.classList.toggle("selected", parseFloat(b.dataset.hours) === state.hours));
+      paintRing();
+    }
+    updateLockStack();
+
+    index = Math.min(Math.max(draft.index, 0), STEPS.length - 1);
+    return true;
+  }
+
   // ── Deck ───────────────────────────────────────────────────────────────────
 
   const deck = el("deck");
@@ -90,6 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (next < 0 || next >= STEPS.length) return;
     index = next;
     render();
+    saveDraft();
   }
 
   function advance() {
@@ -116,6 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
   el("ackBox").addEventListener("change", (e) => {
     state.acknowledged = e.target.checked;
     refreshGate();
+    saveDraft();
   });
 
   // ── 1 · Intent ─────────────────────────────────────────────────────────────
@@ -127,6 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
         b.classList.toggle("selected", b === btn));
       applyMode();
       refreshGate();
+      saveDraft();
     });
   });
 
@@ -188,6 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
       paintMeter(key);
       syncDwellControl();
       refreshGate();
+      saveDraft();
     });
     sensPicker.appendChild(btn);
   });
@@ -324,6 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     updateLockStack();
     refreshGate();
+    saveDraft();
   });
 
   async function validatePartner() {
@@ -346,6 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.partnerLabel = el("partnerName").value.trim() || null;
     updateLockStack();
     refreshGate();
+    saveDraft();
   }
 
   ["partnerPhrase", "partnerRepeat", "partnerName"].forEach((id) => {
@@ -361,19 +449,23 @@ document.addEventListener("DOMContentLoaded", () => {
   el("optWindow").addEventListener("change", (e) => {
     state.windowEnabled = e.target.checked;
     updateLockStack();
+    saveDraft();
   });
   el("winStart").addEventListener("change", (e) => {
     state.windowStart = Number(e.target.value);
     updateLockStack();
+    saveDraft();
   });
   el("winEnd").addEventListener("change", (e) => {
     state.windowEnd = Number(e.target.value);
     updateLockStack();
+    saveDraft();
   });
 
   el("optStrictKid").addEventListener("change", (e) => {
     e.target.dataset.touched = "1";
     state.dwell = e.target.checked;
+    saveDraft();
   });
 
   el("openDeploy").addEventListener("click", () => {
@@ -399,6 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function setIncognito(stateName, text, switchOn) {
     incognitoOn = Boolean(switchOn);
+    saveDraft();
     incognitoWord = stateName === "ok" ? "Allowed"
       : stateName === "skipped" ? "Skipped"
       : stateName === "unknown" ? "Unverified"
@@ -428,6 +521,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   el("openSettingsBtn").addEventListener("click", () => {
+    // Changing incognito access reloads the extension, which can take this tab with it.
+    // Mark the draft so the service worker knows to bring the page back.
+    saveDraft({ resumePending: true });
     chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
     if (!poll) poll = setInterval(checkIncognito, 1500);
   });
@@ -456,6 +552,7 @@ document.addEventListener("DOMContentLoaded", () => {
         b.classList.toggle("selected", b === btn));
       paintRing();
       refreshGate();
+      saveDraft();
     });
   });
 
@@ -513,6 +610,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       onboardingCompleted: true,
     });
+    await storageRemove(DRAFT_KEY);
     window.close();
   }
 
@@ -537,6 +635,7 @@ document.addEventListener("DOMContentLoaded", () => {
         clean.onboardingCompleted = true;
 
         await storageSet(clean);
+        await storageRemove(DRAFT_KEY);
         window.close();
       } catch {
         alert("Invalid CleanTab backup file.");
@@ -548,7 +647,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ── Boot ───────────────────────────────────────────────────────────────────
 
-  updateLockStack();
-  paintMeter(null);
-  render();
+  (async () => {
+    updateLockStack();
+    paintMeter(null);
+    const resumed = await restoreDraft();
+    render();
+    if (resumed) {
+      // We are back; the worker no longer needs to reopen this page.
+      saveDraft({ resumePending: false });
+    }
+  })();
 });

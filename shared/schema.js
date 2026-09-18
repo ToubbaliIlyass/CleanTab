@@ -52,6 +52,9 @@ function getDefaults(dateStr) {
     // person on this device, which changes what the popup emphasises and what the
     // onboarding recommended.
     setupMode: "self",
+    // In-progress onboarding answers, so a mid-flow extension reload (granting incognito
+    // access causes one) does not throw the user back to step one. Cleared on finish.
+    onboardingDraft: null,
 
     // ── Lock strength (shared/lock.js) ──
     // Friction on turning CleanTab off. Deliberately separate from the per-page escape
