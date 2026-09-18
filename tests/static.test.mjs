@@ -75,6 +75,38 @@ export default async function () {
     eq(unused, []);
   });
 
+  // Chrome validates managed_schema.json with its own policy-schema parser, NOT a
+  // generic JSON Schema one, and a rejected schema fails the whole manifest — the
+  // extension will not load at all. This shipped once: `"additionalProperties": false`
+  // is legal draft-07 and illegal here, because Chrome expects a schema object.
+  t("managed schema uses only what Chrome's parser accepts", () => {
+    const schema = JSON.parse(read("managed_schema.json"));
+    const problems = [];
+
+    const walk = (node, path) => {
+      if (!node || typeof node !== "object") return;
+      if (typeof node.additionalProperties === "boolean") {
+        problems.push(`${path}.additionalProperties is a boolean; Chrome needs a schema object or the key omitted`);
+      }
+      // Chrome requires an explicit type on every schema node.
+      if (path !== "$" && !node.type && !node.$ref) {
+        problems.push(`${path} has no "type"`);
+      }
+      for (const [key, value] of Object.entries(node.properties || {})) {
+        walk(value, `${path}.${key}`);
+      }
+      if (node.items) walk(node.items, `${path}[]`);
+    };
+
+    if (typeof schema.additionalProperties === "boolean") {
+      problems.push(`$.additionalProperties is a boolean; Chrome needs a schema object or the key omitted`);
+    }
+    for (const [key, value] of Object.entries(schema.properties || {})) {
+      walk(value, `$.${key}`);
+    }
+    eq(problems, []);
+  });
+
   t("managed schema is declared and exists", () => {
     ok(manifest.storage?.managed_schema, "manifest must declare storage.managed_schema");
     ok(exists(manifest.storage.managed_schema), "the schema file must exist");
