@@ -952,3 +952,81 @@ or passes one to `fetch`.
 
 No end-to-end automation. Puppeteer with `--load-extension` would cover the install,
 pause-page, popup and Sites groups cheaply and is the obvious next investment.
+
+---
+
+## 10. Coverage layers as product surface (queued 2026-09-18)
+
+`/deploy` currently tells people to go and set up DNS filtering and OS parental controls
+themselves, then never mentions them again. That is honest but inert: the advice is given
+once, at the moment someone is least likely to act on it, and nothing afterwards knows
+whether they did. The three-layer framing is the most trust-building thing on the site —
+it should be a feature, not a paragraph.
+
+### What CleanTab can and cannot do at each layer
+
+An extension cannot configure system DNS, and cannot touch Screen Time, Family Link or
+Family Safety. Anything here is **verification and guidance**, never enforcement. Saying
+so plainly is the point; the whole reason this section exists is that the competitors
+imply total coverage.
+
+| Layer | Configure? | Verify? | How |
+|-------|-----------|---------|-----|
+| DNS filtering | No | **Yes** | Resolve-time behaviour is observable from the page |
+| OS controls | No | No | Manual attestation only |
+| CleanTab itself | Yes | Yes | Already known — settings, policy, incognito access |
+
+### 10.1 DNS layer — a real check, not a link
+
+Protective resolvers (NextDNS, Cloudflare for Families on `1.1.1.3`, AdGuard DNS) answer
+a blocked domain with `NXDOMAIN` or a sinkhole address. A `fetch()` to a known-blocked
+hostname therefore fails differently under a filtering resolver than under an open one,
+which is enough to distinguish them without the extension ever loading the content.
+
+Design constraints this has to respect:
+
+- **Never request a real adult domain.** Use the providers' own published test endpoints
+  where they exist. A check that pulls a porn hostname to see if it resolves is a worse
+  privacy story than the one we are trying to prove, and it would put that hostname in the
+  network log of a machine belonging to someone trying to avoid it.
+- **This is the only outbound request CleanTab would make that is not user-initiated.**
+  It has to be opt-in, run on demand rather than on a schedule, and be declared in the
+  privacy policy alongside the appeal fetch. Right now the policy says the appeal is the
+  single exception; that sentence changes the day this ships.
+- Failure is inconclusive, not "unprotected" — offline looks identical to filtered.
+
+### 10.2 OS layer — attestation, and nothing more
+
+No API exposes Screen Time or Family Link to an extension. The honest version is a
+checklist the user ticks themselves, per platform, with links to the right settings pane.
+Store the attestation with a timestamp and treat it as what it is: something the user
+said, not something we checked. Label it that way in the UI.
+
+### 10.3 The surface: a Coverage panel
+
+A fourth popup tab, or a section in Guard:
+
+```
+Layer 1 · Network      Checked · NextDNS responding      [Re-check]
+Layer 2 · Device       You confirmed Screen Time is on   [Review]
+Layer 3 · This browser Protected · policy detected       
+```
+
+Rules for it:
+
+- Three states only — verified, attested, unknown. Never imply verified when attested.
+- "Unknown" is the honest default and must not be rendered as a failure.
+- A guardian setup (`setupMode: "guardian"`) should surface this immediately after
+  onboarding, because that is the user who most needs to hear that one browser is not
+  coverage.
+
+### 10.4 Sequencing, and what not to do
+
+Ship order: 10.3 with layer 3 only (already fully known) → 10.2 attestation → 10.1 DNS
+check last, because it is the one that changes the privacy claim and therefore needs the
+policy page updated in the same release.
+
+**Do not announce any of this on the landing page or in the store listing before it
+ships.** The current copy's whole value is that it undersells, and a "coming soon" on a
+privacy claim is the fastest way to lose that. It also invites a Web Store reviewer to
+ask about network behaviour the extension does not yet have.
