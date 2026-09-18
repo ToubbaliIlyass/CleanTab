@@ -124,6 +124,14 @@
             <h1 class="headline">How much signal<br/>before it blocks?</h1>
             <p class="lede">Pick one to continue. You can change it any time from the Guard tab.</p>
             <div class="picker" id="sensPicker"></div>
+
+            <label class="option compact" for="optStrictKid">
+              <input type="checkbox" id="optStrictKid"/>
+              <span class="option-copy">
+                <span class="option-title">Also scan images you linger on</span>
+                <span class="option-sub" id="dwellSub">Classifies pictures locally, only when you stop on one. Costs some battery. Unavailable on Lenient.</span>
+              </span>
+            </label>
           </div>
 
           <div class="col-visual">
@@ -154,19 +162,35 @@
               friction as you&apos;ll actually keep.
             </p>
 
-            <!-- Self path -->
-            <div class="option-list" id="selfLock">
+            <!-- Guardian-only: the uninstall problem, which no in-extension option solves -->
+            <div class="option-list" id="guardianLock" style="display:none">
+              <div class="notice">
+                <p class="notice-title">The off switch is only half of it</p>
+                <p class="notice-body">
+                  An extension can&apos;t stop its own uninstall — that takes an admin
+                  policy. Our generator writes the file for you and closes the bypasses:
+                  Incognito, guest profiles, developer tools.
+                </p>
+                <button class="link-btn" id="openDeploy">Open the setup guide →</button>
+                <p class="notice-foot">Opens in a new tab. Come back and this page checks whether it took.</p>
+              </div>
+
+            </div>
+
+            <!-- Shown on BOTH paths. A parent holding a passphrase their child does not
+                 know is the same mechanism as an accountability partner. -->
+            <div class="option-list" id="sharedLock">
               <label class="option" for="optPartner">
                 <input type="checkbox" id="optPartner"/>
                 <span class="option-copy">
-                  <span class="option-title">Ask someone to hold the passphrase</span>
-                  <span class="option-sub">They type it now and keep it. You&apos;ll need them present to turn protection off. Stored as a one-way hash — no account, nothing sent anywhere.</span>
+                  <span class="option-title" id="partnerOptTitle">Ask someone to hold the passphrase</span>
+                  <span class="option-sub" id="partnerOptSub">They type it now and keep it. Stored as a one-way hash — no account, nothing sent anywhere.</span>
                 </span>
               </label>
 
               <div class="sub-panel" id="partnerPanel" style="display:none">
                 <input class="field" id="partnerName" type="text" placeholder="Their name (optional)" autocomplete="off" spellcheck="false"/>
-                <input class="field" id="partnerPhrase" type="password" placeholder="Their passphrase (8+ characters)" autocomplete="new-password"/>
+                <input class="field" id="partnerPhrase" type="password" placeholder="Passphrase (8+ characters)" autocomplete="new-password"/>
                 <input class="field" id="partnerRepeat" type="password" placeholder="Type it again" autocomplete="new-password"/>
                 <p class="field-error" id="partnerError" style="display:none"></p>
               </div>
@@ -174,31 +198,8 @@
               <label class="option" for="optWindow">
                 <input type="checkbox" id="optWindow"/>
                 <span class="option-copy">
-                  <span class="option-title">Lock the off switch overnight</span>
+                  <span class="option-title" id="windowOptTitle">Lock the off switch overnight</span>
                   <span class="option-sub">Between <select class="inline-select" id="winStart"></select> and <select class="inline-select" id="winEnd"></select>, protection can&apos;t be disabled at all. Chosen now, while it&apos;s easy.</span>
-                </span>
-              </label>
-            </div>
-
-            <!-- Guardian path -->
-            <div class="option-list" id="guardianLock" style="display:none">
-              <div class="notice">
-                <p class="notice-title">The off switch is only half of it</p>
-                <p class="notice-body">
-                  An extension can&apos;t stop itself being uninstalled — that takes an
-                  admin policy on the device. We wrote a generator that produces the file
-                  for you, and it covers the bypasses too: Incognito, guest profiles and
-                  developer tools.
-                </p>
-                <button class="link-btn" id="openDeploy">Open the setup guide →</button>
-                <p class="notice-foot">Opens cleantab.acture.co in a new tab. You can come back to this one.</p>
-              </div>
-
-              <label class="option" for="optStrictKid">
-                <input type="checkbox" id="optStrictKid"/>
-                <span class="option-copy">
-                  <span class="option-title">Turn on image scanning now</span>
-                  <span class="option-sub">Classifies pictures they linger on, locally. Costs some battery. Recommended when you&apos;re setting this up for someone else.</span>
                 </span>
               </label>
             </div>
@@ -229,8 +230,9 @@
               <div class="lock-layer" data-layer="policy">
                 <span class="lock-tick"></span>
                 <span class="lock-name">Admin policy</span>
-                <span class="lock-state">Needs setup</span>
+                <span class="lock-state">Off</span>
               </div>
+              <button class="link-btn small" id="recheckPolicy" style="display:none">Check for a policy again</button>
               <p class="lock-foot" id="lockFoot">Getting past one wrong block stays one click, whatever you turn on here.</p>
             </div>
           </div>
@@ -319,6 +321,7 @@
               </div>
               <p class="ring-caption" id="ringCaption">Your ring closes when your browsing is this clean.</p>
               <p class="ring-foot">It resets every morning. A bad day costs you nothing.</p>
+              <div class="summary" id="summary"></div>
             </div>
           </div>
           </div>

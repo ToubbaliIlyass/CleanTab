@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     windowEnd: 6,
     dwell: false,
     incognitoResolved: false,
+    policyActive: false,
     hours: null,
   };
 
@@ -76,7 +77,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
+    if (index === 3) checkPolicy();
     if (index === 4) checkIncognito();
+    if (index === 5) renderSummary();
   }
 
   function refreshGate() {
@@ -129,8 +132,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyMode() {
     const guardian = state.mode === "guardian";
-    el("selfLock").style.display = guardian ? "none" : "";
+    // The partner passphrase and the overnight lock apply to BOTH paths. They used to be
+    // inside the self-only block, so on the guardian path the lock stack advertised two
+    // layers with no control anywhere to turn them on.
     el("guardianLock").style.display = guardian ? "" : "none";
+    el("recheckPolicy").style.display = guardian ? "" : "none";
+
+    el("partnerOptTitle").textContent = guardian
+      ? "Set a passphrase they don't know"
+      : "Ask someone to hold the passphrase";
+    el("partnerOptSub").textContent = guardian
+      ? "You keep it. They can't disable protection without you. Stored as a one-way hash."
+      : "They type it now and keep it. Stored as a one-way hash — nothing is sent anywhere.";
+    el("windowOptTitle").textContent = guardian
+      ? "Lock the off switch overnight"
+      : "Lock the off switch overnight";
 
     el("lockHeadline").innerHTML = guardian
       ? "Make it hard<br/>to remove."
@@ -148,10 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
       : "This sets the browsing floor your ring needs before a day counts. Rough is fine.";
 
     // The guardian path recommends image scanning; the self path leaves it off.
-    if (guardian && !el("optStrictKid").dataset.touched) {
-      el("optStrictKid").checked = true;
-      state.dwell = true;
-    }
+    syncDwellControl();
     updateLockStack();
   }
 
@@ -173,6 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
       state.sensitivity = key;
       sensPicker.querySelectorAll(".pick").forEach((b) => b.classList.toggle("selected", b === btn));
       paintMeter(key);
+      syncDwellControl();
       refreshGate();
     });
     sensPicker.appendChild(btn);
@@ -205,6 +219,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Lenient disables image scanning at the profile level, so offering the toggle there
+  // would be a control that silently does nothing.
+  function syncDwellControl() {
+    const box = el("optStrictKid");
+    const allowed = !state.sensitivity || SENSITIVITY_PROFILES[state.sensitivity].dwell;
+    box.disabled = !allowed;
+    if (!allowed) { box.checked = false; state.dwell = false; }
+    else if (state.mode === "guardian" && !box.dataset.touched) { box.checked = true; state.dwell = true; }
+    el("dwellSub").textContent = allowed
+      ? "Classifies pictures locally, only when you stop on one. Costs some battery."
+      : "Lenient turns image scanning off entirely, so this isn't available.";
+  }
+
   function drawRows(isOn) {
     meterRows.innerHTML = "";
     METER_ROWS.forEach((text, i) => {
@@ -229,29 +256,64 @@ document.addEventListener("DOMContentLoaded", () => {
   hourOptions(el("winStart"), 22);
   hourOptions(el("winEnd"), 6);
 
-  function updateLockStack() {
-    const on = {
-      passphrase: true,
-      cooldown: true,
-      partner: state.partnerEnabled && Boolean(state.partnerHash),
-      window: state.windowEnabled,
-      policy: false,
-    };
-    document.querySelectorAll(".lock-layer").forEach((layer) => {
-      const key = layer.dataset.layer;
-      layer.classList.toggle("on", Boolean(on[key]));
-      const stateEl = layer.querySelector(".lock-state");
-      if (key === "partner") stateEl.textContent = on.partner ? "On" : "Off";
-      if (key === "window") {
-        stateEl.textContent = on.window
+  // What is actually on, in one place, so the stack and the closing summary can never
+  // disagree with each other.
+  function lockLayers() {
+    const guardian = state.mode === "guardian";
+    return {
+      passphrase: { on: true, label: "Typed passphrase", state: "Always on" },
+      cooldown:   { on: true, label: "Cooldown, doubling", state: "Always on" },
+      partner: {
+        on: state.partnerEnabled && Boolean(state.partnerHash),
+        label: guardian ? "Passphrase only you know" : "Partner holds the key",
+        state: state.partnerEnabled && state.partnerHash
+          ? (state.partnerLabel ? state.partnerLabel : "On")
+          : "Off",
+      },
+      window: {
+        on: state.windowEnabled,
+        label: "Overnight lock",
+        state: state.windowEnabled
           ? `${formatHour(state.windowStart)}–${formatHour(state.windowEnd)}`
-          : "Off";
-      }
-      if (key === "policy") {
-        stateEl.textContent = state.mode === "guardian" ? "See the guide" : "Optional";
-      }
+          : "Off",
+      },
+      policy: {
+        on: state.policyActive,
+        label: "Admin policy",
+        state: state.policyActive ? "Detected" : (guardian ? "Not set up yet" : "Off"),
+      },
+    };
+  }
+
+  function updateLockStack() {
+    const layers = lockLayers();
+    document.querySelectorAll(".lock-layer").forEach((layer) => {
+      const info = layers[layer.dataset.layer];
+      if (!info) return;
+      layer.classList.toggle("on", info.on);
+      layer.querySelector(".lock-name").textContent = info.label;
+      layer.querySelector(".lock-state").textContent = info.state;
     });
   }
+
+  // The admin-policy layer used to be hardcoded off, so it could never reflect reality —
+  // you could set the policy up and the card would still say it was not there. Managed
+  // storage is populated the moment a policy applies, which makes this checkable the same
+  // way incognito access is.
+  function checkPolicy() {
+    if (!chrome.storage?.managed) { updateLockStack(); return; }
+    try {
+      chrome.storage.managed.get(null, (values) => {
+        void chrome.runtime.lastError;
+        state.policyActive = Boolean(values && Object.keys(values).length);
+        updateLockStack();
+      });
+    } catch {
+      updateLockStack();
+    }
+  }
+
+  el("recheckPolicy").addEventListener("click", checkPolicy);
 
   el("optPartner").addEventListener("change", (e) => {
     state.partnerEnabled = e.target.checked;
@@ -330,7 +392,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let poll = null;
 
+  let incognitoOn = false;
+  let incognitoWord = "Not allowed";
+
+  function incognitoSummary() { return incognitoWord; }
+
   function setIncognito(stateName, text, switchOn) {
+    incognitoOn = Boolean(switchOn);
+    incognitoWord = stateName === "ok" ? "Allowed"
+      : stateName === "skipped" ? "Skipped"
+      : stateName === "unknown" ? "Unverified"
+      : "Not allowed";
     el("incognitoStatus").dataset.state = stateName;
     el("incognitoStatusText").textContent = text;
     el("mockSwitch").classList.toggle("on", Boolean(switchOn));
@@ -367,7 +439,10 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshGate();
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && index === 4) checkIncognito();
+    if (document.visibilityState !== "visible") return;
+    // Both of these are things the user leaves the tab to do.
+    if (index === 3) checkPolicy();
+    if (index === 4) checkIncognito();
   });
 
   // ── 5 · Your day ───────────────────────────────────────────────────────────
@@ -384,6 +459,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  function renderSummary() {
+    const layers = lockLayers();
+    const box = el("summary");
+    const rows = [
+      ["Sensitivity", state.sensitivity ? SENSITIVITY_PROFILES[state.sensitivity].label : "Balanced", true],
+      ["Image scanning", state.dwell ? "On" : "Off", state.dwell],
+      [layers.partner.label, layers.partner.state, layers.partner.on],
+      [layers.window.label, layers.window.state, layers.window.on],
+      ["Incognito", incognitoSummary(), incognitoOn],
+      [layers.policy.label, layers.policy.state, layers.policy.on],
+    ];
+    box.innerHTML = `<p class="summary-head">What you've turned on</p>`;
+    for (const [name, value, on] of rows) {
+      const row = document.createElement("div");
+      row.className = `summary-row${on ? " on" : ""}`;
+      row.innerHTML = `<span class="summary-name"></span><span class="summary-value"></span>`;
+      row.querySelector(".summary-name").textContent = name;
+      row.querySelector(".summary-value").textContent = value;
+      box.appendChild(row);
+    }
+    const foot = document.createElement("p");
+    foot.className = "summary-foot";
+    foot.textContent = "All of this lives in the Guard tab — you can change it there.";
+    box.appendChild(foot);
+  }
+
   function paintRing() {
     const goalPct = 95;
     el("ringPct").textContent = `${goalPct}%`;
@@ -399,9 +500,9 @@ document.addEventListener("DOMContentLoaded", () => {
   async function finish() {
     await storageSet({
       selfEstimateHours: state.hours,
+      enableDwellDetection: state.dwell,
       goalMinutes: computeInitialGoal(state.hours),
       sensitivity: state.sensitivity || DEFAULT_SENSITIVITY,
-      enableDwellDetection: state.dwell,
       setupMode: state.mode || "self",
       partnerLockHash: state.partnerHash,
       partnerLockLabel: state.partnerLabel,

@@ -44,6 +44,11 @@ chrome.storage.local.clear(); chrome.storage.session.clear();
 | 1.7 | **Intent routing — "Someone I look after"** | Step 4 reads "hard to remove", shows the admin-policy notice with a link to /deploy, and pre-checks image scanning | |
 | 1.8 | Partner setup in onboarding | Enter mismatched phrases → error, Next blocked. Matching 8+ char phrases → lock stack shows "Partner holds the key: On" | |
 | 1.9 | Live previews | Sensitivity meter fills and its rows change per profile; lock stack ticks as options toggle; ring fills and states the computed minutes | |
+| 1.9a | **Lock layers turn on for real** | Ticking the partner option and entering a matching phrase flips "Partner holds the key" to the name you typed. Ticking the overnight lock shows the hour range. Both work on **either** setup path — they used to exist only on the self path, so the guardian card advertised layers with no control | |
+| 1.9b | **Admin policy is detected, not assumed** | With no policy: "Not set up yet". Apply a managed policy, return to the tab or press "Check for a policy again" → flips to "Detected". It was hardcoded off before, so setting a policy up changed nothing on screen | |
+| 1.9c | Image scanning is on the sensitivity step | Picking Lenient disables the toggle and explains why; guardian mode pre-checks it on the other two profiles | |
+| 1.9d | Closing summary | The last step lists sensitivity, image scanning, both lock layers, incognito and policy — with the enabled ones highlighted. Values must match what the lock stack showed | |
+| 1.9e | Lock step fits without scrolling | Guardian path, partner panel open, overnight lock on, at 1280×800 → nothing clipped, no page scrollbar | |
 | 1.10 | Incognito verification | Opens this extension's row; returning flips the status to green by itself and the mock toggle animates on. Skip also unblocks Next | |
 | 1.11 | Completion | Tab closes. Verify `setupMode`, `sensitivity`, `goalMinutes`, `enableDwellDetection`, `partnerLockHash`, `lockWindow` all stored | |
 | 1.12 | `https://en.wikipedia.org/wiki/Camera` | No redirect | |
@@ -239,7 +244,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 
 | Group | Pass | Fail | Notes |
 |-------|------|------|-------|
-| 1 — Smoke | / 18 | | |
+| 1 — Smoke | / 23 | | |
 | 2 — False positives | **6** / 13 | 0 | 2.1–2.6 passed 2026-09-17; 2.7–2.13 added 2026-09-18 after the discussion-vs-hosting regression and are UNRUN. Originally passed after text scanning widened to all non-feed pages, image scanning widened to all sites, and the keyword list grew to 45 entries |
 | 3 — True positives | / 8 | | |
 | 4 — Pause page | / 7 | | |
@@ -252,7 +257,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 11 — Lock strength | / 12 | | |
 | 12 — Managed policy | / 9 | | |
 
-**100 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
+**105 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
 ---
 
