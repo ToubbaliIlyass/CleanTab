@@ -257,6 +257,18 @@
           <p class="managed-note" id="managedNote" style="display:none"></p>
         </div>
 
+        <div class="panel-rule"></div>
+
+        <!-- Onboarding used to be reachable exactly once, on install. Lose that tab —
+             granting incognito access reloads the extension and closes it — and there
+             was no way back to it from anywhere in the UI. -->
+        <div class="guard-block">
+          <p class="section-label">Setup</p>
+          <p class="guard-desc">Walk through the setup again — what CleanTab does, sensitivity, lock strength and incognito.</p>
+          <button class="guard-btn" id="rerunSetupBtn">Run setup again</button>
+          <p class="guard-desc subtle" id="rerunNote" style="display:none"></p>
+        </div>
+
       </div>
     </div>
 

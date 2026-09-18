@@ -52,6 +52,9 @@ chrome.storage.local.clear(); chrome.storage.session.clear();
 | 1.9f | **Survives the incognito reload** | On step 5, press "Open extension settings", turn on Allow in Incognito. Chrome restarts the extension. Return to the onboarding tab → you are **still on step 5** with every earlier answer intact (mode, sensitivity, partner, window). Before this was fixed the page reset to step 1 and lost everything | |
 | 1.9g | Tab reopens if Chrome closed it | Same as 1.9f, but if the onboarding tab is gone after the reload, it comes back by itself at the right step. The hook runs at **service worker start**, not from onInstalled/onStartup — an extension reload fires neither of those, so wiring it to them meant the tab never returned | |
 | 1.9h | Resume is opt-in | Close the onboarding tab without pressing "Open extension settings", then reload the extension → onboarding does **not** reopen. Only the interrupted case resumes | |
+| 1.9j | **Onboarding is reachable at all** | Guard tab → Setup → "Run setup again" opens it. This is the only route back once the install-time tab is gone, and granting incognito access closes that tab | |
+| 1.9k | Re-run starts from current settings | Sensitivity, image scanning, lock window and partner state are pre-filled from what is stored, not blank | |
+| 1.9l | **Re-run cannot clear a partner lock** | With a partner passphrase set, "Run setup again" asks for it first. Wrong phrase → refused. Under `allowDisable: false` → refused outright | |
 | 1.9i | Saved passphrase after a reload | After 1.9f with a partner passphrase set, the fields are empty but a note says it is saved. The lock stack still shows the partner layer on, and finishing stores the hash | |
 | 1.10 | Incognito verification | Opens this extension's row; returning flips the status to green by itself and the mock toggle animates on. Skip also unblocks Next | |
 | 1.11 | Completion | Tab closes. Verify `setupMode`, `sensitivity`, `goalMinutes`, `enableDwellDetection`, `partnerLockHash`, `lockWindow` all stored | |
@@ -248,7 +251,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 
 | Group | Pass | Fail | Notes |
 |-------|------|------|-------|
-| 1 — Smoke | / 28 | | |
+| 1 — Smoke | / 31 | | |
 | 2 — False positives | **6** / 13 | 0 | 2.1–2.6 passed 2026-09-17; 2.7–2.13 added 2026-09-18 after the discussion-vs-hosting regression and are UNRUN. Originally passed after text scanning widened to all non-feed pages, image scanning widened to all sites, and the keyword list grew to 45 entries |
 | 3 — True positives | / 8 | | |
 | 4 — Pause page | / 7 | | |
@@ -261,7 +264,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 11 — Lock strength | / 12 | | |
 | 12 — Managed policy | / 9 | | |
 
-**110 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
+**113 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
 ---
 

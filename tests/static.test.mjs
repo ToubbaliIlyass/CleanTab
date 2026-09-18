@@ -162,6 +162,26 @@ export default async function () {
     });
   }
 
+  // Onboarding was reachable exactly once, on install. Granting incognito access
+  // reloads the extension and closes that tab, after which there was no route back to
+  // it from anywhere in the UI. Something must always be able to open it.
+  t("onboarding is reachable from the popup", () => {
+    const js = read("popup/popup.js");
+    ok(/onboarding\/onboarding\.html/.test(js),
+      "the popup must be able to open the onboarding page");
+    ok(read("popup/popup.html").includes("rerunSetupBtn"),
+      "the popup needs a control that opens it");
+  });
+
+  // Re-running setup writes the lock settings, so without a gate it is a way to clear a
+  // partner passphrase someone else set.
+  t("re-running setup goes through the disable gate", () => {
+    const js = read("popup/popup.js");
+    const handler = js.slice(js.indexOf('el("rerunSetupBtn")'), js.indexOf('// ── Lock strength controls'));
+    ok(handler.includes("disablePermission"), "must consult disablePermission");
+    ok(handler.includes("partnerLockHash"), "must require the partner passphrase when one is set");
+  });
+
   // ── Privacy: the product claims to make no network requests ────────────────
   t("no remote resources in any HTML page", () => {
     const pages = ["popup/popup.html", "redirect/redirect.html",

@@ -537,6 +537,11 @@ document.addEventListener("DOMContentLoaded", () => {
       partnerContinue.classList.add("disabled");
       return;
     }
+    if (partnerRerunPending) {
+      partnerRerunPending = false;
+      await openOnboarding();
+      return;
+    }
     if (partnerRemovalPending) {
       partnerRemovalPending = false;
       await storageSet({ partnerLockHash: null, partnerLockLabel: null });
@@ -700,6 +705,52 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
 
+  // ── Re-run setup ───────────────────────────────────────────────────────────
+  //
+  // Re-running setup writes the same keys onboarding writes, which includes the lock
+  // settings. That makes it a way to CLEAR a partner passphrase — a child could simply
+  // re-run setup and drop the lock their parent set. So it goes through the same gate
+  // the off switch does.
+
+  async function openOnboarding() {
+    // Clear any stale draft so the flow starts at the beginning rather than resuming
+    // into the middle of an older, abandoned run.
+    await storageRemove("onboardingDraft");
+    chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/onboarding.html") });
+    window.close();
+  }
+
+  el("rerunSetupBtn")?.addEventListener("click", async () => {
+    const data = await storageGet([
+      "partnerLockHash", "partnerLockLabel", "lockWindow",
+    ]);
+    const managed = await loadManaged();
+    const permission = disablePermission(data, managed);
+
+    if (!permission.allowed) {
+      el("lockedTitle").textContent = permission.reason === "managed"
+        ? "Locked by your administrator"
+        : "Outside your unlock hours";
+      el("lockedDetail").textContent = permission.detail;
+      showView("view-locked");
+      return;
+    }
+
+    if (data.partnerLockHash) {
+      el("partnerPrompt").textContent =
+        `${data.partnerLabel || "Whoever holds the passphrase"} must enter it before setup can be run again.`;
+      el("partnerInput").value = "";
+      el("partnerError").style.display = "none";
+      el("partnerContinue").disabled = true;
+      el("partnerContinue").classList.add("disabled");
+      partnerRerunPending = true;
+      showView("view-partner");
+      return;
+    }
+
+    openOnboarding();
+  });
+
   // ── Lock strength controls ─────────────────────────────────────────────────
 
   function hourOptions(select, selected) {
@@ -755,6 +806,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // An administrator's values are read-only. Say so rather than presenting a control
     // that silently refuses.
+    const rerunNote = el("rerunNote");
+    if (rerunNote) {
+      if (data.partnerLockHash) {
+        rerunNote.style.display = "";
+        rerunNote.textContent =
+          `${data.partnerLabel || "Your partner"} will need to enter the passphrase first — otherwise re-running setup would be a way to clear it.`;
+      } else {
+        rerunNote.style.display = "none";
+      }
+    }
+
     const note = el("managedNote");
     const lockedKeys = MANAGEABLE_KEYS.filter((k) => isSettingManaged(managed, k));
     if (note) {
@@ -781,6 +843,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Partner setup / removal
   let partnerRemovalPending = false;
+  let partnerRerunPending = false;
 
   el("partnerSetupBtn")?.addEventListener("click", async () => {
     const { partnerLockHash } = await storageGet(["partnerLockHash"]);

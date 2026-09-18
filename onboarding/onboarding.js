@@ -57,6 +57,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 120);
   }
 
+  // Re-running setup should start from what you already have, not from blank. Without
+  // this, a parent who re-runs it to change sensitivity and skips the partner step
+  // would silently drop the passphrase they set — setup would become a way to weaken
+  // the lock rather than configure it.
+  async function loadExistingSettings() {
+    let data;
+    try {
+      data = await storageGet([
+        "onboardingCompleted", "setupMode", "sensitivity", "enableDwellDetection",
+        "partnerLockHash", "partnerLockLabel", "lockWindow", "selfEstimateHours",
+      ]);
+    } catch {
+      return false;
+    }
+    if (!data.onboardingCompleted) return false;
+
+    state.acknowledged = true;               // already agreed to this once
+    state.mode = data.setupMode || "self";
+    state.sensitivity = data.sensitivity || null;
+    state.dwell = Boolean(data.enableDwellDetection);
+    state.partnerHash = data.partnerLockHash || null;
+    state.partnerLabel = data.partnerLockLabel || null;
+    state.partnerEnabled = Boolean(data.partnerLockHash);
+    state.windowEnabled = Boolean(data.lockWindow?.enabled);
+    state.windowStart = Number.isFinite(data.lockWindow?.startHour) ? data.lockWindow.startHour : 22;
+    state.windowEnd = Number.isFinite(data.lockWindow?.endHour) ? data.lockWindow.endHour : 6;
+    state.hours = data.selfEstimateHours ?? null;
+
+    el("ackBox").checked = true;
+    document.querySelectorAll("#modePicker .pick").forEach((b) =>
+      b.classList.toggle("selected", b.dataset.mode === state.mode));
+    applyMode();
+    if (state.sensitivity) {
+      sensPicker.querySelectorAll(".pick").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.sens === state.sensitivity));
+      paintMeter(state.sensitivity);
+    }
+    el("optStrictKid").checked = state.dwell;
+    el("optPartner").checked = state.partnerEnabled;
+    el("partnerPanel").style.display = state.partnerEnabled ? "" : "none";
+    if (state.partnerHash) {
+      el("partnerError").style.display = "";
+      el("partnerError").style.color = "var(--text2)";
+      el("partnerError").textContent = state.partnerLabel
+        ? `${state.partnerLabel}'s passphrase is already set. Retype both fields to change it.`
+        : "A passphrase is already set. Retype both fields to change it.";
+    }
+    el("optWindow").checked = state.windowEnabled;
+    el("winStart").value = String(state.windowStart);
+    el("winEnd").value = String(state.windowEnd);
+    if (state.hours !== null) {
+      document.querySelectorAll("#hoursPicker .pick").forEach((b) =>
+        b.classList.toggle("selected", parseFloat(b.dataset.hours) === state.hours));
+      paintRing();
+    }
+    updateLockStack();
+    return true;
+  }
+
   async function restoreDraft() {
     let draft;
     try {
@@ -651,6 +710,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateLockStack();
     paintMeter(null);
     const resumed = await restoreDraft();
+    if (!resumed) await loadExistingSettings();
     render();
     if (resumed) {
       // We are back; the worker no longer needs to reopen this page.
