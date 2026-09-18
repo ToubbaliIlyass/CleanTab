@@ -30,6 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     windowStart: 22,
     windowEnd: 6,
     dwell: false,
+    nano: false,
     incognitoResolved: false,
     policyActive: false,
     hours: null,
@@ -66,6 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       data = await storageGet([
         "onboardingCompleted", "setupMode", "sensitivity", "enableDwellDetection",
+        "enableNanoAssist",
         "partnerLockHash", "partnerLockLabel", "lockWindow", "selfEstimateHours",
       ]);
     } catch {
@@ -77,6 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.mode = data.setupMode || "self";
     state.sensitivity = data.sensitivity || null;
     state.dwell = Boolean(data.enableDwellDetection);
+    state.nano = Boolean(data.enableNanoAssist);
     state.partnerHash = data.partnerLockHash || null;
     state.partnerLabel = data.partnerLockLabel || null;
     state.partnerEnabled = Boolean(data.partnerLockHash);
@@ -95,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
       paintMeter(state.sensitivity);
     }
     el("optStrictKid").checked = state.dwell;
+    el("optNano").checked = state.nano;
     el("optPartner").checked = state.partnerEnabled;
     el("partnerPanel").style.display = state.partnerEnabled ? "" : "none";
     if (state.partnerHash) {
@@ -136,6 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
       windowStart: Number.isFinite(draft.windowStart) ? draft.windowStart : 22,
       windowEnd: Number.isFinite(draft.windowEnd) ? draft.windowEnd : 6,
       dwell: Boolean(draft.dwell),
+      nano: Boolean(draft.nano),
       incognitoResolved: Boolean(draft.incognitoResolved),
       hours: draft.hours ?? null,
     });
@@ -153,6 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
       paintMeter(state.sensitivity);
     }
     el("optStrictKid").checked = state.dwell;
+    el("optNano").checked = state.nano;
     el("optPartner").checked = state.partnerEnabled;
     el("partnerPanel").style.display = state.partnerEnabled ? "" : "none";
     if (state.partnerHash) {
@@ -521,6 +527,30 @@ document.addEventListener("DOMContentLoaded", () => {
     saveDraft();
   });
 
+  // Availability is a property of the machine, so say what was found rather than
+  // offering a switch that does nothing.
+  (async () => {
+    const box = el("optNano");
+    const sub = el("nanoSub");
+    const res = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "nanoStatus" }, (r) => {
+        void chrome.runtime.lastError;
+        resolve(r);
+      });
+    });
+    if (res?.availability && res.availability !== "unavailable") return;
+    box.disabled = true;
+    box.checked = false;
+    state.nano = false;
+    sub.textContent =
+      "Not available on this machine. Everything else works exactly the same — this only ever adds a second opinion.";
+  })();
+
+  el("optNano").addEventListener("change", (e) => {
+    state.nano = e.target.checked;
+    saveDraft();
+  });
+
   el("optStrictKid").addEventListener("change", (e) => {
     e.target.dataset.touched = "1";
     state.dwell = e.target.checked;
@@ -621,6 +651,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rows = [
       ["Sensitivity", state.sensitivity ? SENSITIVITY_PROFILES[state.sensitivity].label : "Balanced", true],
       ["Image scanning", state.dwell ? "On" : "Off", state.dwell],
+      ["On-device AI", state.nano ? "On" : "Off", state.nano],
       [layers.partner.label, layers.partner.state, layers.partner.on],
       [layers.window.label, layers.window.state, layers.window.on],
       ["Incognito", incognitoSummary(), incognitoOn],

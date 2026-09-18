@@ -157,14 +157,61 @@ function textEvidence(text) {
 // The gate for a TEXT-ONLY block. Title, URL and image evidence are unaffected — a page
 // full of explicit headings or flagged images still blocks regardless of what it says
 // about itself.
+// Searching for a way OUT. The keyword is identical in "porn" and in "how to stop
+// watching porn" — only the purpose differs — so no weight, boundary or density rule can
+// separate them. These markers can, and getting this wrong is the worst failure this
+// product has: blocking someone's search for recovery support with the tool they
+// installed to recover.
+//
+// Kept separate from discussionSignals, which describes a page BODY. A query is a few
+// words, so one strong marker is enough, where a body needs three.
+const helpSeekingMarkers = [
+  "how to stop", "how do i stop", "how to quit", "how do i quit", "how to give up",
+  "stop watching", "stop looking", "give up", "quit", "quitting", "stopping",
+  "help", "helpline", "advice", "support group", "support for",
+  "addiction", "addicted", "compulsive", "recovery", "recovering", "relapse",
+  "nofap", "abstinence", "sobriety", "accountability", "blocker", "block",
+  "therapy", "therapist", "counselling", "counseling", "rehab",
+  "effects of", "is it bad", "why am i", "am i addicted", "withdrawal",
+  "research", "study", "statistics", "harms", "harmful",
+  // Question-shaped. Someone asking ABOUT the subject is not asking FOR it.
+  "bad for", "dangers", "danger of", "effect on", "effects on", "impact of",
+  "is porn", "does porn", "why does", "what does", "how does", "can porn",
+  "side effects", "myths", "explained",
+];
+
+const helpSeekingRegexes = helpSeekingMarkers.map((phrase) => ({
+  regex: new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i"),
+}));
+
+function queryIsHelpSeeking(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  for (const [key, value] of parsed.searchParams.entries()) {
+    if (PASSTHROUGH_PARAMS.has(key.toLowerCase())) continue;
+    const text = String(value || "").toLowerCase();
+    if (!text) continue;
+    if (helpSeekingRegexes.some(({ regex }) => regex.test(text))) return true;
+  }
+  return false;
+}
+
 // Rule 1 (URL intent) fires before any text is considered, which is right for a search
 // query — someone typed it — and wrong for a topic slug. A news article at
 // /article/porn-addiction-study scores 5 on the path alone and was blocked outright,
 // so the commentary suppression added for the text rule never got a chance to run.
 //
 // A query parameter still always counts: that is intent, not subject matter.
-function urlBlocksPage(urlScore, evidence, profile, fromQuery = false) {
+function urlBlocksPage(urlScore, evidence, profile, fromQuery = false, helpSeeking = false) {
   if (urlScore < profile.urlScore) return false;
+  // A search results page is not explicit content — the risk is what gets clicked, and
+  // that destination is scanned on its own merits. So letting a help-seeking search
+  // through costs very little and blocking it costs a great deal.
+  if (helpSeeking) return false;
   if (fromQuery) return true;
   return !isCommentary(evidence);
 }

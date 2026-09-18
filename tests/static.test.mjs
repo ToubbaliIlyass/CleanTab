@@ -13,13 +13,14 @@ const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const BUNDLES = {
   "service worker": [
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/keywords.js",
-    "shared/scoring.js", "shared/pageshape.js", "shared/review.js", "shared/schema.js",
-    "shared/lock.js",
+    "shared/scoring.js", "shared/pageshape.js", "shared/nano.js", "shared/review.js",
+    "shared/schema.js", "shared/lock.js",
     "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js",
     "shared/storage.js", "background.js",
   ],
   "content script": ["shared/domains.js", "shared/keywords.js", "shared/thresholds.js",
-                     "shared/scoring.js", "shared/pageshape.js", "content.js"],
+                     "shared/scoring.js", "shared/pageshape.js", "shared/nano.js",
+                     "content.js"],
   "popup": [
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/schema.js",
     "shared/lock.js",
@@ -147,8 +148,8 @@ export default async function () {
   // ── No dangling globals ────────────────────────────────────────────────────
   const SHARED_FILES = [
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/keywords.js",
-    "shared/scoring.js", "shared/pageshape.js", "shared/review.js", "shared/schema.js",
-    "shared/lock.js",
+    "shared/scoring.js", "shared/pageshape.js", "shared/nano.js", "shared/review.js",
+    "shared/schema.js", "shared/lock.js",
     "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js", "shared/storage.js",
   ];
   const ALL_SHARED = new Set(SHARED_FILES.flatMap(declarationsIn));

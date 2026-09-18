@@ -168,7 +168,9 @@ function scan() {
 
     // 1. Strong URL intent — global, applies everywhere including YouTube. A query
     // value always counts; a path slug does not, if the page itself reads as commentary.
-    if (urlBlocksPage(scores.url, evidence, profile, urlScoreFromQuery(url))) {
+    if (urlBlocksPage(
+      scores.url, evidence, profile, urlScoreFromQuery(url), queryIsHelpSeeking(url),
+    )) {
       reportVerdict(false, 5);
       triggerRedirect("Search or link contained high-risk keywords");
       return;
@@ -202,11 +204,67 @@ function scan() {
       return;
     }
 
+    // Nothing fired. Before settling, ask whether this is a page the rules are merely
+    // unsure about — a near miss, or a block they talked themselves out of. Only those
+    // are worth a model, and the answer arrives asynchronously so the page is never
+    // held up waiting for it.
+    maybeAdjudicate({ url, scores, evidence, profile, wouldBlock: false });
+
     reportVerdict(true, riskLevel(scores, profile));
   } catch (error) {
     console.error("CleanTab scan error:", error);
     // Never let a detection failure break the page.
   }
+}
+
+// ── Second opinion ────────────────────────────────────────────────────────────
+//
+// The rules decide; this only runs where they are genuinely unsure. It can add a block
+// they missed — which is the whole non-English and euphemism case, since those pages
+// score zero on an English keyword list — and it can clear one they were already
+// hesitant about. It can never clear a page that blocked on strong evidence, because
+// such a page is never sent (adjudicationAllowed in shared/nano.js).
+
+let adjudicating = false;
+
+function maybeAdjudicate(context) {
+  if (adjudicating || redirectTriggered || scanningSuppressed()) return;
+
+  const enriched = {
+    scores: context.scores,
+    profile: context.profile,
+    evidence: context.evidence,
+    wouldBlock: context.wouldBlock,
+    commentary: isCommentary(context.evidence),
+    saturated: Boolean(context.evidence && context.evidence.density >= 60 &&
+      context.evidence.occurrences >= 8),
+    knownAdultDomain: false, // the worker knows the blocklist; it re-checks there
+  };
+  if (!adjudicationAllowed(enriched)) return;
+
+  adjudicating = true;
+  chrome.runtime.sendMessage({
+    action: "nanoAdjudicate",
+    context: enriched,
+    page: {
+      url: context.url,
+      title: document.title || "",
+      text: (document.body?.innerText || "").slice(0, 4000),
+    },
+  }, (res) => {
+    adjudicating = false;
+    if (chrome.runtime.lastError || !res?.verdict) return;
+    if (redirectTriggered || scanningSuppressed()) return;
+
+    const decision = applyAdjudication(
+      { blocked: context.wouldBlock, reason: "" },
+      res.verdict,
+    );
+    if (decision.blocked && !context.wouldBlock) {
+      reportVerdict(false, 5);
+      triggerRedirect(decision.reason);
+    }
+  });
 }
 
 let scanTimeout;

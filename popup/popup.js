@@ -402,6 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await updateInlineInsight();
     await renderSensitivity();
     await renderLockStrength();
+    renderNano();
     await loadProgress();
 
     const data = await storageGet(["enabled", "cooldownUntil", "disableUntil"]);
@@ -704,6 +705,57 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+
+  function sendMessage(msg) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(msg, (res) => {
+        void chrome.runtime.lastError;
+        resolve(res);
+      });
+    });
+  }
+
+  // ── Gemini Nano second opinion ─────────────────────────────────────────────
+  //
+  // Most machines will not support it, so the control has to say what it found rather
+  // than offering a switch that silently does nothing.
+
+  async function renderNano() {
+    const box = el("nanoToggle");
+    const sub = el("nanoSub");
+    if (!box || !sub) return;
+
+    const { enableNanoAssist } = await storageGet(["enableNanoAssist"]);
+    box.checked = enableNanoAssist === true;
+
+    let status;
+    try {
+      status = await sendMessage({ action: "nanoStatus" });
+    } catch {
+      status = { availability: "unavailable" };
+    }
+
+    const state = status?.availability || "unavailable";
+    if (state === "unavailable") {
+      box.disabled = true;
+      box.checked = false;
+      sub.textContent =
+        "Not available on this machine. Detection works exactly as before — this only ever adds a second opinion.";
+      return;
+    }
+
+    box.disabled = false;
+    sub.textContent = state === "available"
+      ? "Ready. Used only on pages the rules are unsure about — it never overrides a clear block."
+      : state === "downloading"
+        ? "Chrome is downloading the model. It will start helping once that finishes."
+        : "Chrome will download the model the first time this is used. It runs on your device; nothing is sent anywhere.";
+  }
+
+  el("nanoToggle")?.addEventListener("change", async (e) => {
+    await storageSet({ enableNanoAssist: e.target.checked });
+    await renderNano();
+  });
 
   // ── Re-run setup ───────────────────────────────────────────────────────────
   //

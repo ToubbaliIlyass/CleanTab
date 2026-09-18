@@ -9,6 +9,7 @@ importScripts(
   "shared/keywords.js",
   "shared/scoring.js",
   "shared/pageshape.js",
+  "shared/nano.js",
   "shared/review.js",
   "shared/schema.js",
   "shared/lock.js",
@@ -211,6 +212,47 @@ async function classifyViaContentScript(tabId, src) {
 function unsafeScore(prediction) {
   if (!prediction) return 0;
   return (prediction.porn || 0) + (prediction.hentai || 0) + (prediction.sexy || 0);
+}
+
+// ── Gemini Nano adjudication ──────────────────────────────────────────────────
+//
+// Only reached for pages the rules are genuinely unsure about — see
+// adjudicationAllowed() in shared/nano.js. Everything else is already decided, faster
+// and deterministically, and a page that earned a block on strong evidence is never
+// sent here at all, so no amount of text on it can argue its way out.
+
+const nanoCache = new Map(); // url -> { verdict, at }
+const NANO_CACHE_MS = 10 * 60 * 1000;
+const NANO_CACHE_MAX = 200;
+
+async function nanoEnabled() {
+  const data = await storageGet(["enableNanoAssist"]);
+  return data.enableNanoAssist === true;
+}
+
+async function getNanoAvailability() {
+  try {
+    await ensureOffscreenDoc();
+    const res = await askOffscreen({ action: "nanoAvailability" }, 8000);
+    return res?.state || "unavailable";
+  } catch {
+    return "unavailable";
+  }
+}
+
+async function adjudicate(page) {
+  const cached = nanoCache.get(page.url);
+  if (cached && Date.now() - cached.at < NANO_CACHE_MS) return cached.verdict;
+
+  await ensureOffscreenDoc();
+  const res = await askOffscreen({ action: "nanoAdjudicate", page }, NANO_TIMEOUT_MS);
+  const verdict = res?.ok ? res.verdict : null;
+
+  if (nanoCache.size >= NANO_CACHE_MAX) {
+    nanoCache.delete(nanoCache.keys().next().value);
+  }
+  nanoCache.set(page.url, { verdict, at: Date.now() });
+  return verdict;
 }
 
 // ── Redirect ──────────────────────────────────────────────────────────────────
@@ -485,6 +527,27 @@ const HANDLERS = {
         ? "Couldn't analyze this page's images — it may load them after opening."
         : `Only ${result.checked} image${result.checked === 1 ? "" : "s"} could be checked. Not enough to clear it.`,
     };
+  },
+
+  // The content script asks for a second opinion, and only when the rules were unsure.
+  async nanoAdjudicate(msg) {
+    if (!(await nanoEnabled())) return { verdict: null, reason: "off" };
+    if (!adjudicationAllowed(msg.context)) return { verdict: null, reason: "not-ambiguous" };
+    try {
+      const verdict = await adjudicate(msg.page);
+      return { verdict };
+    } catch (err) {
+      // Never let the model's absence or slowness change a page's fate.
+      return { verdict: null, reason: String(err?.message || err) };
+    }
+  },
+
+  async nanoStatus() {
+    const [availability, enabled] = await Promise.all([
+      getNanoAvailability(),
+      nanoEnabled(),
+    ]);
+    return { availability, enabled };
   },
 
   async getHealth() {

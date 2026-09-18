@@ -46,6 +46,9 @@ function getDefaults(dateStr) {
     cooldownUntil: null,
     sensitivity: DEFAULT_SENSITIVITY,
     enableDwellDetection: false, // plan §8.8 asked for this flag; it shipped on instead
+    // Gemini Nano second opinion. Off by default: it needs a multi-gigabyte model that
+    // Chrome downloads on first use, and most machines do not meet its requirements.
+    enableNanoAssist: false,
     onboardingCompleted: false,
     selfEstimateHours: null,
     // Which onboarding path was taken. "guardian" means someone set this up for another

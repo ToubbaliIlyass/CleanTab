@@ -28,6 +28,7 @@
         "shared/thresholds.js",
         "shared/scoring.js",
         "shared/pageshape.js",
+        "shared/nano.js",
         "content.js"
       ],
       "run_at": "document_idle"

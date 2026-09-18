@@ -192,5 +192,59 @@ export default async function () {
   t("an unparseable url has no query score", () =>
     notOk(run(`urlScoreFromQuery("not a url")`)));
 
+  // ── Help-seeking queries ───────────────────────────────────────────────────
+  //
+  // The worst false positive this product can have. "porn" and "how to stop watching
+  // porn" contain the same keyword; only the purpose differs, so scoring cannot
+  // separate them. Blocking the second one means the tool someone installed to quit
+  // blocks their search for help quitting.
+
+  const searchBlocks = (q) => {
+    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+    return run(`
+      urlBlocksPage(
+        getURLScore(${JSON.stringify(url)}),
+        textEvidence(""),
+        getProfile("balanced"),
+        urlScoreFromQuery(${JSON.stringify(url)}),
+        queryIsHelpSeeking(${JSON.stringify(url)})
+      )`);
+  };
+
+  for (const q of [
+    "how to stop watching porn",
+    "how do i quit porn",
+    "porn addiction help",
+    "quit porn support group",
+    "nofap porn recovery",
+    "is porn bad for you",
+    "effects of porn on the brain",
+    "porn addiction statistics",
+    "does porn affect relationships",
+    "porn blocker for chrome",
+    "porn addiction therapist",
+  ]) {
+    t(`help-seeking: "${q}" is not blocked`, () =>
+      notOk(searchBlocks(q), "searching for a way out must never be blocked"));
+  }
+
+  for (const q of ["porn", "free porn videos", "hentai", "best porn sites", "xxx videos"]) {
+    t(`seeking content: "${q}" still blocks`, () => ok(searchBlocks(q)));
+  }
+
+  // A search results page is not itself explicit; the destination is scanned on its own
+  // merits. That is what makes letting these through cheap.
+  t("help markers do not leak into page-body scoring", () => {
+    // "quit" and "help" are help markers but must not suppress a dense hosting page.
+    ok(blocks("Free porn videos xxx nude hentai milf naked porn tube. Quit? Help."));
+  });
+
+  t("an unparseable url is not treated as help-seeking", () =>
+    notOk(run(`queryIsHelpSeeking("not a url")`)));
+
+  t("help markers are read from query values, not the path", () =>
+    notOk(run(`queryIsHelpSeeking("https://example.com/how-to-stop-watching-porn")`),
+      "a path slug is handled by the commentary rule instead"));
+
   return t;
 }
