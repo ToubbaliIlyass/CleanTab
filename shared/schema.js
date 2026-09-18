@@ -48,6 +48,10 @@ function getDefaults(dateStr) {
     enableDwellDetection: false, // plan §8.8 asked for this flag; it shipped on instead
     onboardingCompleted: false,
     selfEstimateHours: null,
+    // Which onboarding path was taken. "guardian" means someone set this up for another
+    // person on this device, which changes what the popup emphasises and what the
+    // onboarding recommended.
+    setupMode: "self",
 
     // ── Lock strength (shared/lock.js) ──
     // Friction on turning CleanTab off. Deliberately separate from the per-page escape

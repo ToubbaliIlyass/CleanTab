@@ -11,145 +11,319 @@
   <link rel="stylesheet" href="onboarding.css"/>
 </head>
 <body>
-<div class="page">
 
-  <nav class="topbar">
+<div class="shell">
+
+  <header class="topbar">
     <div class="wordmark"><span class="accent">Clean</span>Tab</div>
-    <div class="step-dots">
-      <span class="dot active" data-dot="0"></span>
-      <span class="dot" data-dot="1"></span>
-      <span class="dot" data-dot="2"></span>
-      <span class="dot" data-dot="3"></span>
-    </div>
-  </nav>
+    <div class="progress" id="progress" aria-hidden="true"></div>
+    <div class="step-count"><span id="stepNow">1</span><span class="of">/</span><span id="stepTotal">6</span></div>
+  </header>
 
-  <!-- ── STEP 1: what this does ── -->
-  <main class="main step is-active" data-step="0">
-    <div class="hero">
-      <div class="step-chip">What it does</div>
-      <h1 class="headline">It reads the page,<br/>not your history.</h1>
-      <p class="sub">
-        CleanTab scores the text and links of pages you open. When a page looks explicit,
-        it swaps the tab for a pause screen and asks what's actually going on.
-      </p>
-    </div>
+  <!-- The deck slides horizontally; the page itself never scrolls. -->
+  <div class="viewport">
+    <div class="deck" id="deck">
 
-    <div class="question-block">
-      <p class="question">Worth knowing before you start</p>
-      <ul class="fact-list">
-        <li><strong>It runs entirely on your device.</strong> No account, no server, no analytics. Nothing leaves your machine.</li>
-        <li><strong>It will get things wrong.</strong> Keyword scoring misfires on health, art and news writing. Every block has a one-click way through, and you can trust a site permanently.</li>
-        <li><strong>Optional image scanning.</strong> If you turn it on, pictures you linger on in feeds get classified locally. It costs battery, so it starts off.</li>
-      </ul>
-    </div>
+      <!-- ═══ 0 · WELCOME ═══ -->
+      <section class="slide" data-step="0">
+        <div class="slide-grid">
+          <div class="col-copy">
+            <div class="chip-label">What it does</div>
+            <h1 class="headline">It reads the page,<br/>not your history.</h1>
+            <p class="lede">
+              CleanTab scores the text, links and images of pages you open. When something
+              looks explicit, it swaps the tab for a pause screen and asks what&apos;s
+              actually going on.
+            </p>
+            <ul class="facts">
+              <li>
+                <span class="facts-dot"></span>
+                <span><strong>Entirely on your device.</strong> No account, no server, no analytics.</span>
+              </li>
+              <li>
+                <span class="facts-dot"></span>
+                <span><strong>It will get things wrong.</strong> Every block has a one-click way through.</span>
+              </li>
+              <li>
+                <span class="facts-dot"></span>
+                <span><strong>Takes about a minute.</strong> Five questions, then you&apos;re done.</span>
+              </li>
+            </ul>
+            <label class="ack" for="ackBox">
+              <input type="checkbox" id="ackBox"/>
+              <span>I understand CleanTab will sometimes block the wrong page, and that I can get through any block myself.</span>
+            </label>
+          </div>
 
-      <label class="ack" for="ackBox">
-        <input type="checkbox" id="ackBox"/>
-        <span>I understand CleanTab will sometimes block the wrong page, and that I can
-          get through any block myself.</span>
-      </label>
-    </div>
+          <div class="col-visual">
+            <!-- A miniature of the pause screen, so the first thing you see is the
+                 thing you'll actually meet. -->
+            <div class="mock mock-pause float">
+              <div class="mock-bar"><span></span><span></span><span></span></div>
+              <div class="mock-body">
+                <div class="mock-badge">Paused</div>
+                <p class="mock-title">What&apos;s going on right now?</p>
+                <div class="mock-chips">
+                  <span>Bored</span><span class="on">Stressed</span><span>Tired</span>
+                  <span>Habit</span><span>Lonely</span>
+                </div>
+                <div class="mock-note">Pick what fits — only you ever see this.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <div class="footer-row">
+      <!-- ═══ 1 · INTENT ═══ -->
+      <section class="slide" data-step="1">
+        <div class="slide-grid narrow">
+          <div class="col-copy wide">
+            <div class="chip-label">Setup</div>
+            <h1 class="headline">Who are you<br/>setting this up for?</h1>
+            <p class="lede">This changes what we ask next, and how hard CleanTab is to switch off.</p>
+
+            <div class="picker two-up" id="modePicker">
+              <button class="pick" data-mode="self">
+                <span class="pick-art" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" fill="none">
+                    <circle cx="32" cy="22" r="10" stroke="currentColor" stroke-width="3"/>
+                    <path d="M12 54c0-11 9-18 20-18s20 7 20 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="pick-title">Myself</span>
+                <span class="pick-sub">I&apos;m choosing this for my own browsing. You stay in control, with friction you set yourself.</span>
+              </button>
+
+              <button class="pick" data-mode="guardian">
+                <span class="pick-art" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" fill="none">
+                    <circle cx="23" cy="22" r="9" stroke="currentColor" stroke-width="3"/>
+                    <circle cx="45" cy="27" r="7" stroke="currentColor" stroke-width="3"/>
+                    <path d="M6 54c0-10 8-16 17-16s17 6 17 16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M42 54c0-8 5-13 11-13" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="pick-title">Someone I look after</span>
+                <span class="pick-sub">A child or family member on this device. We&apos;ll show you how to lock it so it can&apos;t be removed.</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 2 · SENSITIVITY ═══ -->
+      <section class="slide" data-step="2">
+        <div class="slide-grid">
+          <div class="col-copy">
+            <div class="chip-label">Sensitivity</div>
+            <h1 class="headline">How much signal<br/>before it blocks?</h1>
+            <p class="lede">Pick one to continue. You can change it any time from the Guard tab.</p>
+            <div class="picker" id="sensPicker"></div>
+          </div>
+
+          <div class="col-visual">
+            <!-- Moves as you choose, so the abstraction has a referent. -->
+            <div class="meter-card">
+              <div class="meter-head">
+                <span class="meter-label">Blocks at</span>
+                <span class="meter-value" id="meterValue">—</span>
+              </div>
+              <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+              <div class="meter-scale"><span>Only obvious</span><span>Weak signals</span></div>
+              <div class="meter-rows" id="meterRows"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 3 · LOCK STRENGTH (branches on intent) ═══ -->
+      <section class="slide" data-step="3">
+        <div class="slide-grid">
+          <div class="col-copy">
+            <div class="chip-label">Lock strength</div>
+            <h1 class="headline" id="lockHeadline">Make it hard<br/>to switch off.</h1>
+            <p class="lede" id="lockLede">
+              A blocker you can turn off in two clicks isn&apos;t a blocker. Turn on as much
+              friction as you&apos;ll actually keep.
+            </p>
+
+            <!-- Self path -->
+            <div class="option-list" id="selfLock">
+              <label class="option" for="optPartner">
+                <input type="checkbox" id="optPartner"/>
+                <span class="option-copy">
+                  <span class="option-title">Ask someone to hold the passphrase</span>
+                  <span class="option-sub">They type it now and keep it. You&apos;ll need them present to turn protection off. Stored as a one-way hash — no account, nothing sent anywhere.</span>
+                </span>
+              </label>
+
+              <div class="sub-panel" id="partnerPanel" style="display:none">
+                <input class="field" id="partnerName" type="text" placeholder="Their name (optional)" autocomplete="off" spellcheck="false"/>
+                <input class="field" id="partnerPhrase" type="password" placeholder="Their passphrase (8+ characters)" autocomplete="new-password"/>
+                <input class="field" id="partnerRepeat" type="password" placeholder="Type it again" autocomplete="new-password"/>
+                <p class="field-error" id="partnerError" style="display:none"></p>
+              </div>
+
+              <label class="option" for="optWindow">
+                <input type="checkbox" id="optWindow"/>
+                <span class="option-copy">
+                  <span class="option-title">Lock the off switch overnight</span>
+                  <span class="option-sub">Between <select class="inline-select" id="winStart"></select> and <select class="inline-select" id="winEnd"></select>, protection can&apos;t be disabled at all. Chosen now, while it&apos;s easy.</span>
+                </span>
+              </label>
+            </div>
+
+            <!-- Guardian path -->
+            <div class="option-list" id="guardianLock" style="display:none">
+              <div class="notice">
+                <p class="notice-title">The off switch is only half of it</p>
+                <p class="notice-body">
+                  An extension can&apos;t stop itself being uninstalled — that takes an
+                  admin policy on the device. We wrote a generator that produces the file
+                  for you, and it covers the bypasses too: Incognito, guest profiles and
+                  developer tools.
+                </p>
+                <button class="link-btn" id="openDeploy">Open the setup guide →</button>
+                <p class="notice-foot">Opens cleantab.acture.co in a new tab. You can come back to this one.</p>
+              </div>
+
+              <label class="option" for="optStrictKid">
+                <input type="checkbox" id="optStrictKid"/>
+                <span class="option-copy">
+                  <span class="option-title">Turn on image scanning now</span>
+                  <span class="option-sub">Classifies pictures they linger on, locally. Costs some battery. Recommended when you&apos;re setting this up for someone else.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="col-visual">
+            <div class="lock-stack" id="lockStack">
+              <div class="lock-layer" data-layer="passphrase">
+                <span class="lock-tick"></span>
+                <span class="lock-name">Typed passphrase</span>
+                <span class="lock-state">Always on</span>
+              </div>
+              <div class="lock-layer" data-layer="cooldown">
+                <span class="lock-tick"></span>
+                <span class="lock-name">Cooldown, doubling</span>
+                <span class="lock-state">Always on</span>
+              </div>
+              <div class="lock-layer" data-layer="partner">
+                <span class="lock-tick"></span>
+                <span class="lock-name">Partner holds the key</span>
+                <span class="lock-state">Off</span>
+              </div>
+              <div class="lock-layer" data-layer="window">
+                <span class="lock-tick"></span>
+                <span class="lock-name">Overnight lock</span>
+                <span class="lock-state">Off</span>
+              </div>
+              <div class="lock-layer" data-layer="policy">
+                <span class="lock-tick"></span>
+                <span class="lock-name">Admin policy</span>
+                <span class="lock-state">Needs setup</span>
+              </div>
+              <p class="lock-foot" id="lockFoot">Getting past one wrong block stays one click, whatever you turn on here.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 4 · INCOGNITO ═══ -->
+      <section class="slide" data-step="4">
+        <div class="slide-grid">
+          <div class="col-copy">
+            <div class="chip-label">Incognito</div>
+            <h1 class="headline">The window that<br/>needs it most.</h1>
+            <p class="lede">
+              Chrome switches every extension off in Incognito by default — including this
+              one. Until you allow it, an Incognito window has no protection at all.
+            </p>
+
+            <ol class="steps">
+              <li><span class="steps-n">1</span> Open the settings page with the button below.</li>
+              <li><span class="steps-n">2</span> Turn on <strong>Allow in Incognito</strong>.</li>
+              <li><span class="steps-n">3</span> Come back here — this page checks by itself.</li>
+            </ol>
+
+            <div class="row-actions">
+              <button class="btn-quiet" id="openSettingsBtn">Open extension settings</button>
+              <button class="btn-quiet" id="recheckBtn">Check again</button>
+            </div>
+
+            <div class="status" id="incognitoStatus" data-state="pending">
+              <span class="status-dot"></span>
+              <span id="incognitoStatusText">Not allowed in Incognito yet.</span>
+            </div>
+            <button class="ghost-btn" id="skipIncognito">Skip — I don&apos;t use Incognito</button>
+          </div>
+
+          <div class="col-visual">
+            <div class="mock mock-browser float">
+              <div class="mock-bar dark"><span></span><span></span><span></span></div>
+              <div class="mock-rows">
+                <div class="mock-row"><span class="mock-ico"></span><span class="mock-line w60"></span></div>
+                <div class="mock-row highlight">
+                  <span class="mock-ico on"></span>
+                  <span class="mock-line w40"></span>
+                  <span class="mock-switch" id="mockSwitch"></span>
+                </div>
+                <div class="mock-row"><span class="mock-ico"></span><span class="mock-line w50"></span></div>
+              </div>
+              <div class="mock-caption">Allow in Incognito</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 5 · YOUR DAY ═══ -->
+      <section class="slide" data-step="5">
+        <div class="slide-grid">
+          <div class="col-copy">
+            <div class="chip-label">Your day</div>
+            <h1 class="headline" id="dayHeadline">One last question.</h1>
+            <p class="lede" id="dayLede">
+              This sets the browsing floor your ring needs before a day counts. Rough is fine.
+            </p>
+            <p class="question" id="dayQuestion">On a normal day, how many hours is this laptop in use?</p>
+            <div class="picker row" id="hoursPicker">
+              <button class="pick small" data-hours="1.5">1–2 hrs</button>
+              <button class="pick small" data-hours="3.5">3–4 hrs</button>
+              <button class="pick small" data-hours="5.5">5–6 hrs</button>
+              <button class="pick small" data-hours="7.5">7–8 hrs</button>
+              <button class="pick small" data-hours="9">8+ hrs</button>
+            </div>
+          </div>
+
+          <div class="col-visual">
+            <div class="ring-card">
+              <svg class="ring" viewBox="0 0 120 120">
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52"/>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-pct" id="ringPct">—</span>
+                <span class="ring-unit">clean</span>
+              </div>
+              <p class="ring-caption" id="ringCaption">Your ring closes when your browsing is this clean.</p>
+              <p class="ring-foot">It resets every morning. A bad day costs you nothing.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <footer class="navbar">
+    <button class="ghost-btn" id="backBtn" style="visibility:hidden">← Back</button>
+    <div class="nav-right">
       <button class="ghost-btn" id="importLink">Restore a backup</button>
       <input type="file" id="importFile" accept=".json" hidden/>
-      <button class="done-btn" data-next="1" data-gate="ack" disabled>Next →</button>
+      <button class="cta" id="nextBtn" disabled>Next <span class="cta-arrow">→</span></button>
     </div>
-  </main>
-
-  <!-- ── STEP 2: sensitivity ── -->
-  <main class="main step" data-step="1">
-    <div class="hero">
-      <div class="step-chip">Sensitivity</div>
-      <h1 class="headline">How much signal<br/>before it blocks?</h1>
-      <p class="sub">Pick one to continue. You can change it any time from the Guard tab.</p>
-    </div>
-
-    <div class="question-block">
-      <div class="chips vertical" id="sensChips"></div>
-      <p class="hint" id="sensHint">Most people should start on Balanced.</p>
-    </div>
-
-    <div class="footer-row">
-      <button class="ghost-btn" data-next="0">← Back</button>
-      <button class="done-btn" data-next="2" data-gate="sens" disabled>Next →</button>
-    </div>
-  </main>
-
-  <!-- ── STEP 3: incognito ── -->
-  <main class="main step" data-step="2">
-    <div class="hero">
-      <div class="step-chip">Incognito</div>
-      <h1 class="headline">The window that<br/>needs it most.</h1>
-      <p class="sub">
-        Chrome disables every extension in incognito by default — including this one. Until
-        you allow it, an incognito window has no protection at all.
-      </p>
-    </div>
-
-    <div class="question-block">
-      <p class="question">Two steps, and this screen will confirm it worked</p>
-      <ol class="fact-list numbered">
-        <li>Open the extension's settings page with the button below.</li>
-        <li>Turn on <strong>Allow in Incognito</strong>, then come back to this tab.</li>
-      </ol>
-
-      <div class="incognito-actions">
-        <button class="chip" id="openSettingsBtn">Open extension settings →</button>
-        <button class="chip" id="recheckBtn">Check again</button>
-      </div>
-
-      <div class="status" id="incognitoStatus" data-state="pending">
-        <span class="status-dot"></span>
-        <span class="status-text" id="incognitoStatusText">Not allowed in incognito yet.</span>
-      </div>
-
-      <p class="hint">
-        CleanTab uses split incognito, so an incognito session keeps its own pauses and
-        never writes incognito browsing into your history or your ring.
-      </p>
-    </div>
-
-    <div class="footer-row">
-      <button class="ghost-btn" data-next="1">← Back</button>
-      <div class="footer-actions">
-        <button class="ghost-btn" id="skipIncognito">Skip — I don't use incognito</button>
-        <button class="done-btn" data-next="3" data-gate="incognito" disabled>Next →</button>
-      </div>
-    </div>
-  </main>
-
-  <!-- ── STEP 4: daily estimate ── -->
-  <main class="main step" data-step="3">
-    <div class="hero">
-      <div class="step-chip">Your day</div>
-      <h1 class="headline">One question<br/>before we start.</h1>
-      <p class="sub">This sets the browsing floor your ring needs before a day counts.</p>
-    </div>
-
-    <div class="question-block">
-      <p class="question">How many hours do you typically use your laptop on a normal day?</p>
-
-      <div class="chips" id="chips">
-        <button class="chip" data-hours="1.5">1–2 hrs</button>
-        <button class="chip" data-hours="3.5">3–4 hrs</button>
-        <button class="chip" data-hours="5.5">5–6 hrs</button>
-        <button class="chip" data-hours="7.5">7–8 hrs</button>
-        <button class="chip" data-hours="9">8+ hrs</button>
-      </div>
-
-      <div class="goal-preview" id="goalPreview" style="opacity:0">
-        <span class="goal-label">Your ring closes at</span>
-        <span class="goal-val" id="goalVal">95</span>
-        <span class="goal-unit">% clean browsing</span>
-      </div>
-    </div>
-
-    <div class="footer-row">
-      <button class="ghost-btn" data-next="2">← Back</button>
-      <button class="done-btn" id="doneBtn" disabled>Get started →</button>
-    </div>
-  </main>
+  </footer>
 
 </div>
 
@@ -157,6 +331,7 @@
 <script src="../shared/domains.js"></script>
 <script src="../shared/thresholds.js"></script>
 <script src="../shared/schema.js"></script>
+<script src="../shared/lock.js"></script>
 <script src="../shared/migrations/v0_to_v1.js"></script>
 <script src="../shared/migrations/v1_to_v2.js"></script>
 <script src="../shared/storage.js"></script>

@@ -33,6 +33,7 @@ const BUNDLES = {
   ],
   "onboarding": [
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/schema.js",
+    "shared/lock.js",
     "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js",
     "shared/storage.js", "onboarding/onboarding.js",
   ],

@@ -36,16 +36,23 @@ chrome.storage.local.clear(); chrome.storage.session.clear();
 | # | Step | Expected | ✓ |
 |---|------|----------|---|
 | 1.1 | Load unpacked on a clean profile | No console errors; onboarding tab opens; `chrome.storage.local` has `schemaVersion: 2` | |
-| 1.2 | Onboarding gating | Next is **disabled** on step 1 until the acknowledgement box is ticked, and on step 2 until a sensitivity is picked (nothing is pre-selected) | |
-| 1.3 | Onboarding incognito step | "Open extension settings" opens this extension's row. Turn on Allow in Incognito, return to the tab → status flips to green **on its own**. "Skip" also unblocks Next, and says incognito will be unprotected | |
-| 1.4 | Complete onboarding | Tab closes; `sensitivity` and `goalMinutes` stored | |
-| 1.5 | `https://en.wikipedia.org/wiki/Camera` | No redirect | |
-| 1.6 | `google.com/search?q=porn` | Redirects to pause page | |
-| 1.7 | Pause page → "This was wrongly flagged" | Two options appear (not before the click) | |
-| 1.8 | → "Let me through once" | Returns to the page and **stays** — no redirect loop | |
-| 1.9 | Open the popup | Current-site card names the site you're on | |
-| 1.10 | Popup → all four tabs | Each renders, nothing clipped at 380×560 | |
-| 1.11 | Pause page + onboarding tab icons | Show the CleanTab icon, not a generic globe | |
+| 1.2 | Onboarding does not scroll | Resize the window. The page never gets a scrollbar — slides move horizontally. On a short window the visual column drops and the slide scrolls internally rather than breaking | |
+| 1.3 | Slide transitions | Next/Back slide right-to-left and back. Progress segments and the N/6 counter track the visible slide | |
+| 1.4 | Keyboard | Enter advances, ← goes back. Enter must **not** fire while typing in the partner passphrase fields | |
+| 1.5 | Gating | Next is disabled until: step 1 acknowledged, step 2 has a mode, step 3 has a sensitivity, step 5 incognito resolved, step 6 hours picked. Step 4 is skippable unless a partner passphrase was started and left unfinished | |
+| 1.6 | **Intent routing — "Myself"** | Step 4 reads "hard to switch off", offers partner passphrase + overnight lock, image scanning stays off | |
+| 1.7 | **Intent routing — "Someone I look after"** | Step 4 reads "hard to remove", shows the admin-policy notice with a link to /deploy, and pre-checks image scanning | |
+| 1.8 | Partner setup in onboarding | Enter mismatched phrases → error, Next blocked. Matching 8+ char phrases → lock stack shows "Partner holds the key: On" | |
+| 1.9 | Live previews | Sensitivity meter fills and its rows change per profile; lock stack ticks as options toggle; ring fills and states the computed minutes | |
+| 1.10 | Incognito verification | Opens this extension's row; returning flips the status to green by itself and the mock toggle animates on. Skip also unblocks Next | |
+| 1.11 | Completion | Tab closes. Verify `setupMode`, `sensitivity`, `goalMinutes`, `enableDwellDetection`, `partnerLockHash`, `lockWindow` all stored | |
+| 1.12 | `https://en.wikipedia.org/wiki/Camera` | No redirect | |
+| 1.13 | `google.com/search?q=porn` | Redirects to pause page | |
+| 1.14 | Pause page → "This was wrongly flagged" | Two options appear (not before the click) | |
+| 1.15 | → "Let me through once" | Returns to the page and **stays** — no redirect loop | |
+| 1.16 | Open the popup | Current-site card names the site you're on | |
+| 1.17 | Popup → all four tabs | Each renders, nothing clipped at 380×560 | |
+| 1.18 | Pause page + onboarding tab icons | Show the CleanTab icon, not a generic globe | |
 
 ---
 
@@ -232,7 +239,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 
 | Group | Pass | Fail | Notes |
 |-------|------|------|-------|
-| 1 — Smoke | / 11 | | |
+| 1 — Smoke | / 18 | | |
 | 2 — False positives | **6** / 13 | 0 | 2.1–2.6 passed 2026-09-17; 2.7–2.13 added 2026-09-18 after the discussion-vs-hosting regression and are UNRUN. Originally passed after text scanning widened to all non-feed pages, image scanning widened to all sites, and the keyword list grew to 45 entries |
 | 3 — True positives | / 8 | | |
 | 4 — Pause page | / 7 | | |
@@ -245,7 +252,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 11 — Lock strength | / 12 | | |
 | 12 — Managed policy | / 9 | | |
 
-**93 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
+**100 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
 ---
 
