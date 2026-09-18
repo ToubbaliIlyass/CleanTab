@@ -61,6 +61,13 @@ chrome.storage.local.clear(); chrome.storage.session.clear();
 | 2.4 | A normal YouTube video | YouTube scoring changed this pass | |
 | 2.5 | X home timeline (logged out, or a fresh account) | Feed pages are explicitly exempt. **Don't use your own Reddit/X account** — a personalised NSFW-leaning feed tests your account, not the extension | |
 | 2.6 | Gmail, GitHub, your bank | Must never fire | |
+| 2.7 | **cleantab.acture.co** — your own landing page | Must not redirect. This shipped broken on 2026-09-17: widening text scanning made CleanTab block every page that *discusses* explicit content, starting with its own marketing site | |
+| 2.8 | The CleanTab GitHub repo and README | Same class as 2.7 | |
+| 2.9 | A news article or study about porn addiction | Must not redirect on Balanced | |
+| 2.10 | A recovery resource — NoFap article, a therapist's page on compulsive use | **Must not redirect.** Blocking recovery material is the worst version of this bug: it denies the user the exact content the tool exists to support | |
+| 2.11 | A sexual-health page (contraception, STI testing, puberty) | Must not redirect | |
+| 2.12 | An art-history page on the nude in classical art | Must not redirect on Balanced | |
+| 2.13 | A review or comparison of porn blockers | Must not redirect — commentary about the product category | |
 
 ---
 
@@ -226,7 +233,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | Group | Pass | Fail | Notes |
 |-------|------|------|-------|
 | 1 — Smoke | / 11 | | |
-| 2 — False positives | **6** / 6 | 0 | Passed 2026-09-17, after text scanning widened to all non-feed pages, image scanning widened to all sites, and the keyword list grew to 45 entries |
+| 2 — False positives | **6** / 13 | 0 | 2.1–2.6 passed 2026-09-17; 2.7–2.13 added 2026-09-18 after the discussion-vs-hosting regression and are UNRUN. Originally passed after text scanning widened to all non-feed pages, image scanning widened to all sites, and the keyword list grew to 45 entries |
 | 3 — True positives | / 8 | | |
 | 4 — Pause page | / 7 | | |
 | 5 — Popup data | / 9 | | |
@@ -238,7 +245,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 11 — Lock strength | / 12 | | |
 | 12 — Managed policy | / 9 | | |
 
-**86 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
+**93 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
 ---
 

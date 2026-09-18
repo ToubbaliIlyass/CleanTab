@@ -47,11 +47,10 @@ function scanningSuppressed() {
 
 // ── Environment keyword clusters ──────────────────────────────────────────────
 
-// NOTE: getEnvironmentScore matches these as plain substrings, not word-boundary
-// anchored. Only terms that are safe to match loosely belong here — "cam" already
-// lights up on camera retailers (checklist test 2.x / MANUAL C6). That is why "pussy"
-// and "tits" are scored as keywords but are NOT anchors: "pussycat" would qualify a
-// page as an adult environment.
+// Matched with word boundaries by getEnvironmentScore (see adultAnchorRegexes below).
+// They used to be plain substring tests, which qualified every camera retailer as an
+// adult environment because "cam" appears in "cameras" — and left the environment gate,
+// the first line of defence for rules 2 and 3, firing on ordinary shopping pages.
 const adultAnchorWords = [
   "porn", "nsfw", "xxx", "cam", "cams", "hentai", "blowjob", "bdsm", "nude",
   "naked", "nudes", "milf", "onlyfans", "camgirl", "creampie", "gangbang",
@@ -63,14 +62,19 @@ const adultContextWords = [
 
 const mediaWords = ["video", "videos", "live", "stream", "watch"];
 
+function boundaryRegex(word) {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "i");
+}
+
+const adultAnchorRegexes = adultAnchorWords.map(boundaryRegex);
+const adultContextRegexes = adultContextWords.map(boundaryRegex);
+const mediaRegexes = mediaWords.map(boundaryRegex);
+
 // Page shape helpers (isInsidePost, isYouTube, isHomeFeed, allowsTextScan) come from
 // shared/pageshape.js, loaded ahead of this file by the manifest.
 
 // ── Scoring ───────────────────────────────────────────────────────────────────
-
-function getTextScore() {
-  return getKeywordScore((document.body?.innerText || "").toLowerCase());
-}
 
 function getExplicitTitleScore() {
   let score = 0;
@@ -98,15 +102,15 @@ function getEnvironmentScore() {
     const text = (el.innerText || "").toLowerCase();
     if (!text) return;
 
-    adultAnchorWords.forEach((w) => {
-      if (text.includes(w)) { anchorCount += 1; score += 3; }
+    adultAnchorRegexes.forEach((r) => {
+      if (r.test(text)) { anchorCount += 1; score += 3; }
     });
 
     // Context and media words amplify, but only once an adult anchor exists —
     // otherwise "live stream" and "private room" light up on ordinary sites.
     if (anchorCount > 0) {
-      adultContextWords.forEach((w) => { if (text.includes(w)) score += 1; });
-      mediaWords.forEach((w) => { if (text.includes(w)) score += 1; });
+      adultContextRegexes.forEach((r) => { if (r.test(text)) score += 1; });
+      mediaRegexes.forEach((r) => { if (r.test(text)) score += 1; });
     }
   });
 
@@ -153,9 +157,10 @@ function scan() {
     // homepage on the web reachable only by URL keywords.
     const textScannable = allowsTextScan(url);
 
+    const evidence = onYouTube ? null : textEvidence(document.body?.innerText || "");
     const scores = {
       url: getURLScore(url),
-      text: onYouTube ? 0 : getTextScore(),
+      text: evidence ? evidence.score : 0,
       title: getExplicitTitleScore(),
     };
     const environmentScore = getEnvironmentScore();
@@ -184,9 +189,12 @@ function scan() {
 
     // 3. Adult environment plus explicit content, gated on the page being a post or a
     // chosen listing.
+    // textBlocksPage() is what keeps a page ABOUT explicit content from being treated
+    // as a page OF it. Title evidence is left on its own terms: explicit headings are
+    // what a hosting page looks like, whatever its prose claims.
     if (
       riskyEnvironment && textScannable && !onYouTube &&
-      (scores.text >= profile.textScore || scores.title >= profile.titleScore - 2)
+      (textBlocksPage(evidence, profile) || scores.title >= profile.titleScore - 2)
     ) {
       reportVerdict(false, 5);
       triggerRedirect("Adult environment + explicit content detected");
