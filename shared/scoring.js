@@ -38,6 +38,22 @@ function getURLScore(url) {
   return score;
 }
 
+// Did any of the URL's score come from a query value? A search is intent; a slug is a
+// topic, and the two deserve different treatment when the page reads as commentary.
+function urlScoreFromQuery(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  for (const [key, value] of parsed.searchParams.entries()) {
+    if (PASSTHROUGH_PARAMS.has(key.toLowerCase())) continue;
+    if (getKeywordScore(`${key} ${value || ""}`.toLowerCase()) > 0) return true;
+  }
+  return false;
+}
+
 // Normalized 0–5 risk for the popup's current-site card. Detection used to be entirely
 // opaque — you could not tell from outside whether CleanTab was doing anything at all.
 function riskLevel(scores, profile) {
@@ -141,11 +157,28 @@ function textEvidence(text) {
 // The gate for a TEXT-ONLY block. Title, URL and image evidence are unaffected — a page
 // full of explicit headings or flagged images still blocks regardless of what it says
 // about itself.
-function textBlocksPage(evidence, profile) {
-  if (!evidence || evidence.score < profile.textScore) return false;
+// Rule 1 (URL intent) fires before any text is considered, which is right for a search
+// query — someone typed it — and wrong for a topic slug. A news article at
+// /article/porn-addiction-study scores 5 on the path alone and was blocked outright,
+// so the commentary suppression added for the text rule never got a chance to run.
+//
+// A query parameter still always counts: that is intent, not subject matter.
+function urlBlocksPage(urlScore, evidence, profile, fromQuery = false) {
+  if (urlScore < profile.urlScore) return false;
+  if (fromQuery) return true;
+  return !isCommentary(evidence);
+}
+
+// Shared by both rules so they cannot disagree about what counts as commentary.
+function isCommentary(evidence) {
+  if (!evidence) return false;
   const saturated = evidence.density >= DENSITY_BEYOND_DISCUSSION &&
     evidence.occurrences >= OCCURRENCES_BEYOND_DISCUSSION;
-  const commentary = evidence.discussion >= DISCUSSION_SUPPRESS_AT && !saturated;
-  if (commentary) return false;
+  return evidence.discussion >= DISCUSSION_SUPPRESS_AT && !saturated;
+}
+
+function textBlocksPage(evidence, profile) {
+  if (!evidence || evidence.score < profile.textScore) return false;
+  if (isCommentary(evidence)) return false;
   return evidence.density >= MIN_DENSITY_PER_1000;
 }

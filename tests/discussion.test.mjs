@@ -148,5 +148,49 @@ export default async function () {
     ok(e.occurrences < 8, "but not saturated");
   });
 
+  // ── Rule 1: query intent vs topic slug ─────────────────────────────────────
+  //
+  // The URL rule fires before any text is considered, so the commentary suppression
+  // above never ran for it. A news article at /article/porn-addiction-study scores 5 on
+  // the path alone and was blocked outright — the exact class the suppression exists to
+  // protect, reached by a different door.
+
+  const urlBlocks = (url, text) => run(`
+    urlBlocksPage(
+      getURLScore(${JSON.stringify(url)}),
+      textEvidence(${JSON.stringify(text)}),
+      getProfile("balanced"),
+      urlScoreFromQuery(${JSON.stringify(url)})
+    )`);
+
+  const COMMENTARY_TEXT = `
+    A new study of compulsive porn use surveyed two thousand adults. Researchers found
+    the addiction framing is contested among therapists. Prevention and education matter
+    more than blocking software or parental controls.`;
+
+  t("a typed search query still blocks", () =>
+    ok(urlBlocks("https://www.google.com/search?q=porn", "")));
+
+  t("a search query blocks even on a commentary-looking page", () =>
+    ok(urlBlocks("https://www.google.com/search?q=porn", COMMENTARY_TEXT),
+      "someone typed this; the page's own words do not excuse it"));
+
+  t("a topic slug on a commentary page does not block", () =>
+    notOk(urlBlocks("https://news.example.com/article/porn-addiction-study", COMMENTARY_TEXT)));
+
+  t("a topic slug on a saturated page still blocks", () =>
+    ok(urlBlocks("https://freetube.example/porn/videos",
+      "Free porn videos nude xxx hentai hardcore milf naked porn tube xxx porn nude cams.")));
+
+  t("a topic slug with no commentary still blocks", () =>
+    ok(urlBlocks("https://example.com/porn/", "")));
+
+  t("query detection ignores passthrough params", () =>
+    notOk(run(`urlScoreFromQuery("https://accounts.google.com/signin?continue=https://x.com/porn")`),
+      "the passthrough skip list must apply here too"));
+
+  t("an unparseable url has no query score", () =>
+    notOk(run(`urlScoreFromQuery("not a url")`)));
+
   return t;
 }

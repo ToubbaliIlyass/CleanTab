@@ -166,8 +166,9 @@ function scan() {
     const environmentScore = getEnvironmentScore();
     const riskyEnvironment = environmentScore >= profile.envScore;
 
-    // 1. Strong URL intent — global, applies everywhere including YouTube.
-    if (scores.url >= profile.urlScore) {
+    // 1. Strong URL intent — global, applies everywhere including YouTube. A query
+    // value always counts; a path slug does not, if the page itself reads as commentary.
+    if (urlBlocksPage(scores.url, evidence, profile, urlScoreFromQuery(url))) {
       reportVerdict(false, 5);
       triggerRedirect("Search or link contained high-risk keywords");
       return;
