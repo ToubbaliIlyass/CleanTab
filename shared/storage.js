@@ -207,6 +207,28 @@ async function grantAllowance(url, ms = ALLOWANCE_MS) {
   await sessionSet({ [ALLOWANCE_KEY]: allowances });
 }
 
+// Use is counted per root domain, in local storage rather than session: a count that
+// resets when the browser restarts is not a limit, it is a suggestion.
+const ALLOWANCE_EVENTS_KEY = "allowanceEvents";
+
+async function getAllowanceEvents() {
+  const data = await storageGet([ALLOWANCE_EVENTS_KEY]);
+  return data[ALLOWANCE_EVENTS_KEY] || {};
+}
+
+async function recordAllowance(domain) {
+  const events = await getAllowanceEvents();
+  await storageSet({ [ALLOWANCE_EVENTS_KEY]: recordAllowanceUse(events, domain) });
+}
+
+async function allowanceStateFor(domain) {
+  const events = await getAllowanceEvents();
+  return {
+    remaining: allowanceRemaining(events, domain),
+    exhausted: allowanceExhausted(events, domain),
+  };
+}
+
 async function hasAllowance(url) {
   const data = await sessionGet([ALLOWANCE_KEY]);
   const allowances = data[ALLOWANCE_KEY] || {};

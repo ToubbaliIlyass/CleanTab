@@ -67,6 +67,9 @@ function getDefaults(dateStr) {
     partnerLockLabel: null,  // who holds it, e.g. "Sam" — for the prompt only
     lockWindow: { enabled: false, startHour: 22, endHour: 6 },
     disableEvents: [],       // timestamps within the escalation window
+    // "Let me through once" uses, per root domain, within a rolling day. Kept in local
+    // storage because a count that resets on browser restart is not a limit.
+    allowanceEvents: {},
 
     // The ring fills on clean SHARE, not on a minute total, so a short clean day closes
     // as well as a long one and shutting the laptop is not a penalty (plan §9.1). A floor

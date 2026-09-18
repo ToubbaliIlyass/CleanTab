@@ -10,6 +10,7 @@ importScripts(
   "shared/scoring.js",
   "shared/pageshape.js",
   "shared/nano.js",
+  "shared/allowance.js",
   "shared/review.js",
   "shared/schema.js",
   "shared/lock.js",
@@ -463,9 +464,12 @@ const HANDLERS = {
     const blocked = tabId ? await readBlocked(tabId) : null;
     if (!blocked) return { reason: "This page was flagged.", domain: "", canAppeal: false };
     const managed = await managedGet();
+    const allowance = await allowanceStateFor(domainFromUrl(blocked.url));
     return {
       reason: blocked.reason,
       domain: domainFromUrl(blocked.url),
+      allowanceRemaining: allowance.remaining,
+      allowanceMessage: allowanceMessage(allowance.remaining),
       // "Let me through once" is deliberately NOT gated here. A policy can withhold
       // permanent trust; it should not make a false positive unreachable.
       canAppeal: !knownAdultDomains.has(domainFromUrl(blocked.url)) &&
@@ -473,14 +477,23 @@ const HANDLERS = {
     };
   },
 
-  // "Let me through once" — 10 minutes, this URL only, session-scoped.
+  // "Let me through once" — 10 minutes, this URL only, session-scoped. Capped at three
+  // uses per root domain per day: the first is a false positive, the fourth is a bypass.
   async allowOnce(msg, sender) {
     const tabId = sender.tab?.id;
     const blocked = tabId ? await readBlocked(tabId) : null;
     if (!blocked) return { ok: false };
+
+    const domain = domainFromUrl(blocked.url);
+    const state = await allowanceStateFor(domain);
+    if (state.exhausted) {
+      return { ok: false, exhausted: true, reason: allowanceMessage(0) };
+    }
+
+    await recordAllowance(domain);
     await grantAllowance(blocked.url);
     chrome.tabs.update(tabId, { url: blocked.url });
-    return { ok: true };
+    return { ok: true, remaining: state.remaining - 1 };
   },
 
   async appealRequest(msg, sender) {

@@ -157,6 +157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const wrongBtn = document.getElementById("wrongBtn");
   const escapeBox = document.getElementById("escapeBox");
   const allowOnceBtn = document.getElementById("allowOnceBtn");
+  const allowOnceSub = document.getElementById("allowOnceSub");
   const trustSiteBtn = document.getElementById("trustSiteBtn");
   const trustSiteSub = document.getElementById("trustSiteSub");
   const appealStatus = document.getElementById("appeal-status");
@@ -167,9 +168,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     appealStatus.textContent = text;
   }
 
+  // Three uses per site per day. Said up front rather than discovered on the fourth
+  // press — a limit you meet by surprise reads as the tool breaking.
+  function paintAllowance() {
+    if (!allowOnceBtn || !allowOnceSub) return;
+    const remaining = ctx.allowanceRemaining;
+    if (typeof remaining !== "number") return;
+
+    if (remaining <= 0) {
+      allowOnceBtn.disabled = true;
+      allowOnceSub.textContent = ctx.allowanceMessage ||
+        "Used three times on this site today.";
+      return;
+    }
+    allowOnceSub.textContent =
+      `This page only, 10 minutes. Nothing saved. ${ctx.allowanceMessage || ""}`.trim();
+  }
+
   wrongBtn?.addEventListener("click", () => {
     if (!escapeBox) return;
     escapeBox.style.display = escapeBox.style.display === "none" ? "flex" : "none";
+    paintAllowance();
     if (!ctx.canAppeal && trustSiteBtn) {
       trustSiteBtn.disabled = true;
       if (trustSiteSub) trustSiteSub.textContent = "This domain is on the adult content blocklist.";
@@ -183,6 +202,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     setStatus("Opening for 10 minutes…", "ok");
     chrome.runtime.sendMessage({ action: "allowOnce" }, (res) => {
       if (chrome.runtime.lastError || !res?.ok) {
+        if (res?.exhausted) {
+          // Not an error — a limit. Point at the path that actually fits a page that
+          // really was flagged wrongly.
+          setStatus(res.reason, "");
+          allowOnceSub.textContent = res.reason;
+          return; // stays disabled
+        }
         setStatus("Couldn't reopen the page — it may have been lost.", "err");
         allowOnceBtn.disabled = false;
       }

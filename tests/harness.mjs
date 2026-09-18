@@ -24,6 +24,7 @@ const SHARED = [
   "shared/scoring.js",
   "shared/pageshape.js",
   "shared/nano.js",
+  "shared/allowance.js",
   "shared/review.js",
   "shared/schema.js",
   "shared/lock.js",

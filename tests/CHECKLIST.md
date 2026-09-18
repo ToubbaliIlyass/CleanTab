@@ -110,6 +110,11 @@ chrome.storage.local.clear(); chrome.storage.session.clear();
 | # | Test | Expected | ✓ |
 |---|------|----------|---|
 | 4.1 | Blocked URL privacy | Address bar and `chrome://history` show only `redirect.html`, never the blocked URL | |
+| 4.1a | **Allowance cap** | Use "Let me through once" three times on one site. The sub-text counts down (3 more → Once more), then the button disables and points at "This site is fine" | |
+| 4.1b | Cap is per root domain | Use it on `site.com/a`, then `site.com/b`, then `site.com/c` → the third exhausts it. A sibling page must not reset the count | |
+| 4.1c | Cap is per site | With one site exhausted, a different site still offers three | |
+| 4.1d | Cap survives a restart | Exhaust a site, quit Chrome fully, reopen → still exhausted. It is a daily limit, not a session one | |
+| 4.1e | Cap resets after a day | Hand-edit the `allowanceEvents` timestamps to 25h ago → three uses again | |
 | 4.2 | Allowance expiry | Wait 10+ min on a let-through page, reload → blocks again | |
 | 4.3 | Allowance scope | Navigate to a different page on the same site → blocks again | |
 | 4.4 | **"This site is fine" on a genuinely explicit site** | **Denied** with a real percentage. Confirm in the worker console that it fetched and classified *the site's* images. Target: a server-rendered tube site — `xhamster.com` or `spankbang.com` reach the pause page via `knownAdultDomains`, so use a **non-blocklisted** clone (search "free porn tube") whose thumbnails are plain `<img src>` in View Source. **Not Reddit** — see the note below | |
@@ -274,7 +279,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 1 — Smoke | / 31 | | |
 | 2 — False positives | **6** / 13 | 0 | 2.1–2.6 passed 2026-09-17; 2.7–2.13 added 2026-09-18 after the discussion-vs-hosting regression and are UNRUN. Originally passed after text scanning widened to all non-feed pages, image scanning widened to all sites, and the keyword list grew to 45 entries |
 | 3 — True positives | / 8 | | |
-| 4 — Pause page | / 7 | | |
+| 4 — Pause page | / 12 | | |
 | 5 — Popup data | / 9 | | |
 | 6 — Minutes | / 3 | | |
 | 7 — Worker | / 4 | | |
@@ -285,7 +290,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 11 — Lock strength | / 12 | | |
 | 12 — Managed policy | / 9 | | |
 
-**124 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
+**129 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
 ---
 
