@@ -5,22 +5,25 @@ Previously `popup.html`, `redirect.html` and `onboarding.html` each loaded
 `fonts.googleapis.com`, which pinged Google on every block event and left the
 redirect page in fallback fonts when offline.
 
-`fonts.css` is generated, not hand-edited. To regenerate:
+`fonts.css` is generated, not hand-edited. The typeface is **Satoshi** (Indian Type
+Foundry, ITF Free Font License) — the same one the landing site uses.
 
-1. Fetch the Google Fonts CSS with a modern browser User-Agent (so you get woff2):
+To regenerate:
+
+1. Fetch the Fontshare CSS:
 
    ```
-   curl -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
-     (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-     "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600&display=swap" \
-     -o fonts-remote.css
+   curl -s "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" \
+     -o /tmp/satoshi.css
    ```
 
-2. Download every `fonts.gstatic.com` URL it references and rewrite each `url(...)` to the
-   bare filename — `url(dm-sans-400.woff2)`. CSS resolves `url()` against the stylesheet's
-   own location, not the page that links it, so a path like `../Assets/fonts/x.woff2`
-   resolves to `Assets/Assets/fonts/` and silently fails. Keep the `unicode-range`
-   descriptors as they are.
-3. Deduplicate by file hash — Bricolage Grotesque is a variable font, so its 600 /
-   700 / 800 faces reference byte-identical files. Deduping takes this directory
-   from ~560K to ~192K.
+2. For each `@font-face`, download only the `.woff2` (the `.woff` and `.ttf` fallbacks are
+   dead weight in a Chrome-only extension) and save it as `satoshi-<weight>.woff2`.
+
+3. Rewrite each `url(...)` to the bare filename — `url(satoshi-700.woff2)`. CSS resolves
+   `url()` against the stylesheet's own location, not the page that links it, so a path
+   like `../Assets/fonts/x.woff2` resolves to `Assets/Assets/fonts/` and silently fails.
+
+**Satoshi has no 600 or 800 weight.** Use only 400, 500, 700 and 900 in page CSS; any
+other value makes the browser synthesise a fake-bold. `tests/static.test.mjs` fails if a
+page asks for a weight this directory does not contain.

@@ -230,10 +230,25 @@ export default async function () {
     eq(missing, []);
   });
 
-  t("fonts.css declares faces for both families", () => {
+  t("fonts.css declares the typeface the pages ask for", () => {
     const css = read("Assets/fonts/fonts.css");
-    ok(css.includes("Bricolage Grotesque"));
-    ok(css.includes("DM Sans"));
+    ok(css.includes("Satoshi"), "Satoshi faces must be declared");
+  });
+
+  // A page asking for a weight with no file behind it gets a synthetic fake-bold, which
+  // looks subtly wrong and is easy to miss. Every weight used must be vendored.
+  t("every font-weight used has a real file", () => {
+    const css = read("Assets/fonts/fonts.css");
+    const declared = new Set(
+      [...css.matchAll(/font-weight:\s*(\d+)/g)].map((m) => Number(m[1])),
+    );
+    const used = new Set();
+    for (const page of ["popup/popup.css", "redirect/redirect.css", "onboarding/onboarding.css"]) {
+      for (const m of read(page).matchAll(/font-weight:\s*(\d+)/g)) used.add(Number(m[1]));
+    }
+    // 400 is the CSS default and always resolvable.
+    const missing = [...used].filter((w) => w !== 400 && !declared.has(w));
+    eq(missing, []);
   });
 
   // ── Model weights are vendored ─────────────────────────────────────────────

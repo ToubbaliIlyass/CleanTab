@@ -13,8 +13,8 @@
   --aborder:  rgba(255,107,53,.2);
   --ok:       #16A34A;
   --warn:     #DC2626;
-  --ff-d:     'Bricolage Grotesque', system-ui, sans-serif;
-  --ff-b:     'DM Sans', system-ui, sans-serif;
+  --ff-d:     'Satoshi', system-ui, -apple-system, sans-serif;
+  --ff-b:     'Satoshi', system-ui, -apple-system, sans-serif;
 }
 
 html, body {
@@ -118,7 +118,7 @@ html, body {
 .pause {
   font-family: var(--ff-d);
   font-size: 64px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -2.5px;
   line-height: 0.95;
   color: var(--text);
@@ -150,7 +150,7 @@ html, body {
 
 .reflect-q {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text2);
   letter-spacing: -0.1px;
   text-transform: uppercase;
@@ -227,7 +227,7 @@ html, body {
   border: none;
   border-radius: 100px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--ff-b);
   cursor: pointer;
   transition: background 0.15s;
@@ -304,7 +304,7 @@ html, body {
 
 .escape-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
 }
 

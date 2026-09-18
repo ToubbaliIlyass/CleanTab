@@ -26,22 +26,24 @@ TensorFlow.js is not a separate file in this repository — it is compiled into 
 `nsfwjs.min.js` browser bundle listed above. The Apache 2.0 attribution is required all
 the same, since the compiled code is redistributed inside the extension package.
 
-## Bricolage Grotesque
+## Satoshi
 
-- **License:** SIL Open Font License 1.1
-- **Copyright:** © 2022 The Bricolage Project Authors
-- **Source:** https://github.com/ateliertriay/bricolage
-- **Use:** display typeface in the popup, pause page and onboarding.
+- **License:** ITF Free Font License (Fontshare)
+- **Copyright:** © Indian Type Foundry
+- **Source:** https://www.fontshare.com/fonts/satoshi
+- **Use:** the single typeface across the popup, pause page and onboarding.
 
-## DM Sans
+Four real weight files (400, 500, 700, 900) are bundled under `Assets/fonts/` rather
+than loaded from a font CDN, so no page in the extension makes a request to fetch a
+typeface. The ITF Free Font License permits this redistribution. The same typeface is
+used on the landing site, so the extension and the site read as one product.
 
-- **License:** SIL Open Font License 1.1
-- **Copyright:** © 2014-2023 Colophon Foundry, Jonny Pinhorn, Indian Type Foundry
-- **Source:** https://github.com/googlefonts/dm-fonts
-- **Use:** body typeface in the popup, pause page and onboarding.
+Satoshi ships no 600 or 800 weight. CSS in this repository therefore uses only the four
+weights above — asking for an unvendored weight would make the browser synthesise a
+fake-bold, which is checked by a test in `tests/static.test.mjs`.
 
-Fonts are bundled under `Assets/fonts/` rather than loaded from Google Fonts, so no page
-in the extension makes a request to a font CDN. The OFL permits this redistribution.
+Previously CleanTab bundled Bricolage Grotesque and DM Sans, both under the SIL Open
+Font License. Those files were removed when the typeface changed.
 
 ---
 

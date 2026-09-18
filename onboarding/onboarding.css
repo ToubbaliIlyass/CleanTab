@@ -12,8 +12,8 @@
   --abg:      rgba(255,107,53,.08);
   --aborder:  rgba(255,107,53,.28);
   --ok:       #229653;
-  --ff-d:     'Bricolage Grotesque', system-ui, sans-serif;
-  --ff-b:     'DM Sans', system-ui, sans-serif;
+  --ff-d:     'Satoshi', system-ui, -apple-system, sans-serif;
+  --ff-b:     'Satoshi', system-ui, -apple-system, sans-serif;
   --ease:     cubic-bezier(.65, 0, .35, 1);
 }
 
@@ -21,7 +21,7 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--s1);
   color: var(--text);
   font-family: var(--ff-b);
   font-size: 14px;
@@ -38,6 +38,7 @@ html, body {
 
 .topbar {
   flex: 0 0 auto;
+  background: var(--bg);
   display: flex;
   align-items: center;
   gap: 24px;
@@ -48,8 +49,8 @@ html, body {
 .wordmark {
   font-family: var(--ff-d);
   font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -.02em;
+  font-weight: 900;
+  letter-spacing: -.03em;
 }
 .accent { color: var(--accent); }
 
@@ -112,19 +113,18 @@ html, body {
   overflow-y: auto;
   display: flex;
   align-items: center;
-  padding: 32px 40px;
+  justify-content: center;
+  padding: 30px 40px;
 }
 
 .slide-grid {
   width: 100%;
-  max-width: 1080px;
-  margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, .85fr);
   gap: 56px;
   align-items: center;
 }
-.slide-grid.narrow { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+.slide-grid.narrow { grid-template-columns: minmax(0, 1fr); max-width: 660px; margin: 0 auto; }
 
 .col-copy { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .col-copy.wide { gap: 18px; }
@@ -136,24 +136,60 @@ html, body {
   min-width: 0;
 }
 
-/* Content lifts in when its slide becomes active. */
-.slide .col-copy > *,
-.slide .col-visual > * {
-  opacity: 0;
-  transform: translateY(14px);
+/* Slides are cards, and the card itself carries the motion.
+ *
+ * The previous version animated each child on .is-active only, with no transition
+ * declared on the resting state — so an outgoing slide's content snapped to invisible
+ * the instant the class was removed while the incoming one eased in. Motion has to be
+ * declared on the element, not on one of its states, or it only plays in one direction.
+ *
+ * Now the card recedes as it leaves and comes forward as it arrives, symmetrically, and
+ * the whole thing rides the deck's horizontal travel. */
+.card {
+  width: 100%;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 44px 48px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 2px rgba(28,25,21,.04),
+    0 12px 28px -10px rgba(28,25,21,.10),
+    0 40px 80px -30px rgba(28,25,21,.14);
+
+  opacity: .25;
+  transform: scale(.93) translateY(10px);
+  transition:
+    opacity .5s var(--ease),
+    transform .55s var(--ease);
+  will-change: transform, opacity;
 }
-.slide.is-active .col-copy > *,
-.slide.is-active .col-visual > * {
+
+.slide.is-active .card {
   opacity: 1;
   transform: none;
-  transition: opacity .5s var(--ease), transform .5s var(--ease);
 }
-.slide.is-active .col-copy > *:nth-child(1) { transition-delay: .08s; }
-.slide.is-active .col-copy > *:nth-child(2) { transition-delay: .13s; }
-.slide.is-active .col-copy > *:nth-child(3) { transition-delay: .18s; }
-.slide.is-active .col-copy > *:nth-child(4) { transition-delay: .23s; }
-.slide.is-active .col-copy > *:nth-child(5) { transition-delay: .28s; }
-.slide.is-active .col-visual > * { transition-delay: .18s; }
+
+/* A gentle second-order lift for the copy, also declared on the element so it plays
+ * both ways rather than only on entry. */
+.card > .slide-grid > .col-copy > *,
+.card > .slide-grid > .col-visual > * {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .42s var(--ease), transform .42s var(--ease);
+}
+.slide.is-active .card > .slide-grid > .col-copy > *,
+.slide.is-active .card > .slide-grid > .col-visual > * {
+  opacity: 1;
+  transform: none;
+}
+.slide.is-active .col-copy > *:nth-child(1) { transition-delay: .10s; }
+.slide.is-active .col-copy > *:nth-child(2) { transition-delay: .15s; }
+.slide.is-active .col-copy > *:nth-child(3) { transition-delay: .20s; }
+.slide.is-active .col-copy > *:nth-child(4) { transition-delay: .25s; }
+.slide.is-active .col-copy > *:nth-child(5) { transition-delay: .30s; }
+.slide.is-active .col-visual > * { transition-delay: .20s; }
 
 /* ── Type ───────────────────────────────────────────────────────────── */
 
@@ -174,9 +210,9 @@ html, body {
   font-family: var(--ff-d);
   text-wrap: balance;
   font-size: clamp(32px, 4.2vw, 46px);
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -.035em;
+  font-weight: 900;
+  line-height: 1.03;
+  letter-spacing: -.04em;
 }
 
 .lede {
@@ -190,7 +226,7 @@ html, body {
 
 .question {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
 }
 
@@ -198,7 +234,7 @@ html, body {
 
 .facts { list-style: none; display: flex; flex-direction: column; gap: 9px; }
 .facts li { display: flex; gap: 10px; font-size: 13.5px; line-height: 1.55; color: var(--text2); }
-.facts li strong { color: var(--text); font-weight: 600; }
+.facts li strong { color: var(--text); font-weight: 700; }
 .facts-dot {
   flex: 0 0 auto;
   width: 5px; height: 5px;
@@ -297,7 +333,7 @@ html, body {
   flex-direction: row;
   padding: 11px 16px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 999px;
 }
 
@@ -348,7 +384,7 @@ html, body {
 .inline-select {
   font-family: inherit;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 2px 6px;
   color: var(--accent);
   background: var(--bg);
@@ -403,7 +439,7 @@ html, body {
   background: var(--abg);
   color: var(--accent);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .row-actions { display: flex; flex-wrap: wrap; gap: 9px; }
@@ -411,7 +447,7 @@ html, body {
 .btn-quiet {
   font-family: inherit;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 9px 15px;
   color: var(--text);
   background: var(--bg);
@@ -487,7 +523,7 @@ html, body {
   background: var(--abg);
   color: var(--accent);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
@@ -505,7 +541,7 @@ html, body {
   border-color: var(--accent);
   background: var(--abg);
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
 }
 .mock-note { font-size: 11px; color: var(--text3); }
 
@@ -571,8 +607,8 @@ html, body {
 
 .meter-head { display: flex; align-items: baseline; justify-content: space-between; }
 .meter-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
-.meter-value { font-family: var(--ff-d); font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
-.meter-value.empty { color: var(--text3); font-size: 15px; font-weight: 600; }
+.meter-value { font-family: var(--ff-d); font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
+.meter-value.empty { color: var(--text3); font-size: 15px; font-weight: 700; }
 
 .meter-track { height: 8px; border-radius: 999px; background: var(--s2); overflow: hidden; }
 .meter-fill {
@@ -644,9 +680,9 @@ html, body {
   transform: rotate(45deg);
 }
 
-.lock-name { flex: 1; font-weight: 600; color: var(--text); }
+.lock-name { flex: 1; font-weight: 700; color: var(--text); }
 .lock-state { font-size: 11px; color: var(--text3); }
-.lock-layer.on .lock-state { color: var(--accent); font-weight: 600; }
+.lock-layer.on .lock-state { color: var(--accent); font-weight: 700; }
 
 .lock-foot {
   margin-top: 6px;
@@ -691,7 +727,7 @@ html, body {
   flex-direction: column;
   align-items: center;
 }
-.ring-pct { font-family: var(--ff-d); font-size: 30px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.ring-pct { font-family: var(--ff-d); font-size: 30px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
 .ring-unit { font-size: 10.5px; color: var(--text3); letter-spacing: .04em; text-transform: uppercase; }
 
 .ring-caption { font-size: 12.5px; text-align: center; color: var(--text2); line-height: 1.5; }
@@ -747,7 +783,8 @@ html, body {
 /* ── Responsive ─────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .slide-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .card { padding: 30px 26px; border-radius: 20px; }
+  .slide-grid { grid-template-columns: minmax(0, 1fr); gap: 30px; }
   .col-visual { order: -1; }
   .picker.two-up { grid-template-columns: 1fr; }
   .topbar, .navbar { padding-left: 24px; padding-right: 24px; }
@@ -756,6 +793,7 @@ html, body {
 }
 
 @media (max-height: 680px) {
+  .card { padding: 26px 30px; }
   .headline { font-size: clamp(26px, 3.4vw, 34px); }
   .col-visual { display: none; }
   .slide-grid { grid-template-columns: minmax(0, 1fr); max-width: 640px; }
@@ -765,6 +803,8 @@ html, body {
   .deck { transition: none; }
   .float { animation: none; }
   .status[data-state="pending"] .status-dot { animation: none; }
-  .slide .col-copy > *, .slide .col-visual > * { opacity: 1; transform: none; }
+  .card { transition: none; opacity: 1; transform: none; }
+  .card > .slide-grid > .col-copy > *,
+  .card > .slide-grid > .col-visual > * { transition: none; opacity: 1; transform: none; }
   .ring-fill, .meter-fill { transition: none; }
 }

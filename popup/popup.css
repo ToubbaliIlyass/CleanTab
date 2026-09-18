@@ -18,8 +18,8 @@
   --warn:     #EF4444;
   --ok:       #16A34A;
   --info:     #2563EB;
-  --ff-d:     'Bricolage Grotesque', system-ui, sans-serif;
-  --ff-b:     'DM Sans', system-ui, sans-serif;
+  --ff-d:     'Satoshi', system-ui, -apple-system, sans-serif;
+  --ff-b:     'Satoshi', system-ui, -apple-system, sans-serif;
 }
 
 /* ── Shell ────────────────────────────────────────────────────────── */
@@ -76,7 +76,7 @@ html, body {
   padding: 5px 11px;
   border-radius: 100px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.01em;
   transition: all 0.2s;
 }
@@ -160,7 +160,7 @@ html, body {
 .ring-pct {
   font-family: var(--ff-d);
   font-size: 42px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -2px;
   color: var(--text);
   line-height: 1;
@@ -194,7 +194,7 @@ html, body {
 .paused-timer {
   font-family: var(--ff-d);
   font-size: 40px;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--text);
   letter-spacing: -1px;
   font-variant-numeric: tabular-nums;
@@ -223,7 +223,7 @@ html, body {
 .stat-n {
   font-family: var(--ff-d);
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--text);
   letter-spacing: -0.5px;
   line-height: 1;
@@ -231,7 +231,7 @@ html, body {
 
 .stat-l {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text3);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -280,7 +280,7 @@ html, body {
   height: 17px;
   font-size: 9px;
   color: var(--text3);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .heatmap-grid {
@@ -357,7 +357,7 @@ html, body {
   background: var(--s1);
   color: var(--text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--ff-b);
   cursor: pointer;
   transition: all 0.15s;
@@ -382,7 +382,7 @@ html, body {
   border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text2);
   font-family: var(--ff-b);
   cursor: pointer;
@@ -410,7 +410,7 @@ html, body {
   border: none;
   color: var(--text3);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--ff-b);
   cursor: pointer;
   letter-spacing: 0.02em;
@@ -461,7 +461,7 @@ html, body {
   line-height: 1.6;
   color: var(--text2);
 }
-.flow-desc strong { color: var(--text); font-weight: 600; }
+.flow-desc strong { color: var(--text); font-weight: 700; }
 
 .passphrase-box {
   padding: 14px 16px;
@@ -503,7 +503,7 @@ html, body {
 .big-timer {
   font-family: var(--ff-d);
   font-size: 42px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: -1px;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -540,7 +540,7 @@ html, body {
   padding: 13px;
   border-radius: 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--ff-b);
   cursor: pointer;
   border: none;
@@ -611,7 +611,7 @@ html, body {
 .site-pill {
   flex-shrink: 0;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: .02em;
   padding: 3px 7px;
   border-radius: 20px;
@@ -634,7 +634,7 @@ html, body {
   flex: 1;
   padding: 6px 8px;
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--ff-b);
   color: var(--text2);
   background: var(--bg);
@@ -702,7 +702,7 @@ html, body {
 
 .site-row-domain {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -722,7 +722,7 @@ html, body {
   padding: 4px 9px;
   font-size: 11px;
   font-family: var(--ff-b);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text2);
   background: var(--bg);
   border: 1.5px solid var(--border);
@@ -772,7 +772,7 @@ html, body {
 .toggle-row input { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
 .toggle-row input:disabled { opacity: .4; }
 .toggle-copy { display: flex; flex-direction: column; gap: 2px; }
-.toggle-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.toggle-title { font-size: 12.5px; font-weight: 700; color: var(--text); }
 .toggle-sub   { font-size: 11px; color: var(--text2); line-height: 1.4; }
 
 /* ── Header badge: "Text only" when the classifier is unavailable ───── */
@@ -800,7 +800,7 @@ html, body {
 }
 
 .lock-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.lock-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.lock-title { font-size: 12.5px; font-weight: 700; color: var(--text); }
 .lock-sub   { font-size: 11px; color: var(--text2); line-height: 1.4; }
 
 .lock-check { accent-color: var(--accent); flex-shrink: 0; }
