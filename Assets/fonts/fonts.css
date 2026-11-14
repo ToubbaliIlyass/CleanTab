@@ -38,3 +38,41 @@
   font-display: swap;
   src: url(satoshi-900.woff2) format('woff2');
 }
+
+/* Playful UI faces, matching the landing site. Gabarito: display + UI. Caveat Brush:
+   hand notes. DM Mono: small labels. Weights declared: Gabarito 500/700/900. */
+@font-face {
+  font-family: 'Gabarito';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(gabarito-500.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Gabarito';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(gabarito-700.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Gabarito';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url(gabarito-900.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Caveat Brush';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(caveat-brush.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(dm-mono.woff2) format('woff2');
+}

@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="128x128" href="../Assets/icon128.png"/>
   <link rel="stylesheet" href="../Assets/fonts/fonts.css"/>
   <link rel="stylesheet" href="onboarding.css"/>
+  <link rel="stylesheet" href="../Assets/theme.css"/>
 </head>
 <body>
 
@@ -22,6 +23,7 @@
 
   <!-- The deck slides horizontally; the page itself never scrolls. -->
   <div class="viewport">
+    <div class="mascot mascot-ob" id="obMascot" aria-hidden="true"></div>
     <div class="deck" id="deck">
 
       <!-- ═══ 0 · WELCOME ═══ -->
@@ -43,7 +45,7 @@
               </li>
               <li>
                 <span class="facts-dot"></span>
-                <span><strong>It will get things wrong.</strong> Every block has a one-click way through.</span>
+                <span><strong>It will get things wrong.</strong> You can ask it to check a page again, and a clean one opens.</span>
               </li>
               <li>
                 <span class="facts-dot"></span>
@@ -52,7 +54,7 @@
             </ul>
             <label class="ack" for="ackBox">
               <input type="checkbox" id="ackBox"/>
-              <span>I understand CleanTab will sometimes block the wrong page, and that I can get through any block myself.</span>
+              <span>I understand CleanTab will sometimes block the wrong page, and that loosening it or switching it off is slow on purpose.</span>
             </label>
           </div>
 
@@ -122,7 +124,7 @@
           <div class="col-copy">
             <div class="chip-label">Sensitivity</div>
             <h1 class="headline">How much signal<br/>before it blocks?</h1>
-            <p class="lede">Pick one to continue. You can change it any time from the Guard tab.</p>
+            <p class="lede">Balanced is a good start, and you can change it any time from the Guard tab.</p>
             <div class="picker" id="sensPicker"></div>
 
             <label class="option compact" for="optNano">
@@ -136,8 +138,8 @@
             <label class="option compact" for="optStrictKid">
               <input type="checkbox" id="optStrictKid"/>
               <span class="option-copy">
-                <span class="option-title">Also scan images you linger on</span>
-                <span class="option-sub" id="dwellSub">Classifies pictures locally, only when you stop on one. Costs some battery. Unavailable on Lenient.</span>
+                <span class="option-title">Check pictures you linger on</span>
+                <span class="option-sub" id="dwellSub">Checks pictures on your device, only ones you stop on. One picture never blocks a page; staying on explicit ones does. Uses some battery.</span>
               </span>
             </label>
           </div>
@@ -235,7 +237,7 @@
                   <button class="link-btn quiet" id="recheckPolicy">Check again</button>
                 </div>
               </div>
-              <p class="lock-foot" id="lockFoot">Getting past one wrong block stays one click, whatever you turn on here.</p>
+              <p class="lock-foot" id="lockFoot">A page you think was blocked wrongly can always be checked again, whatever you turn on here.</p>
             </div>
           </div>
           </div>
@@ -297,19 +299,12 @@
         <div class="card">
           <div class="slide-grid">
           <div class="col-copy">
-            <div class="chip-label">Your day</div>
+            <div class="chip-label">All set</div>
             <h1 class="headline" id="dayHeadline">One last question.</h1>
             <p class="lede" id="dayLede">
               This sets the browsing floor your ring needs before a day counts. Rough is fine.
             </p>
-            <p class="question" id="dayQuestion">On a normal day, how many hours is this laptop in use?</p>
-            <div class="picker row" id="hoursPicker">
-              <button class="pick small" data-hours="1.5">1–2 hrs</button>
-              <button class="pick small" data-hours="3.5">3–4 hrs</button>
-              <button class="pick small" data-hours="5.5">5–6 hrs</button>
-              <button class="pick small" data-hours="7.5">7–8 hrs</button>
-              <button class="pick small" data-hours="9">8+ hrs</button>
-            </div>
+            <button class="ghost-btn" id="tryPauseBtn">Try a practice pause</button>
           </div>
 
           <div class="col-visual">
@@ -320,10 +315,10 @@
               </svg>
               <div class="ring-center">
                 <span class="ring-pct" id="ringPct">—</span>
-                <span class="ring-unit">clean</span>
+                <span class="ring-unit">of 14 days</span>
               </div>
               <p class="ring-caption" id="ringCaption">Your ring closes when your browsing is this clean.</p>
-              <p class="ring-foot">It resets every morning. A bad day costs you nothing.</p>
+              <p class="ring-foot">A slip lowers it by one and it recovers as the days pass. Nothing ever resets to zero.</p>
               <div class="summary" id="summary"></div>
             </div>
           </div>
@@ -345,6 +340,7 @@
 
 </div>
 
+<script src="../Assets/mascot/mascot.js"></script>
 <script src="../shared/dates.js"></script>
 <script src="../shared/domains.js"></script>
 <script src="../shared/thresholds.js"></script>
@@ -352,6 +348,7 @@
 <script src="../shared/lock.js"></script>
 <script src="../shared/migrations/v0_to_v1.js"></script>
 <script src="../shared/migrations/v1_to_v2.js"></script>
+<script src="../shared/protection.js"></script>
 <script src="../shared/storage.js"></script>
 <script src="onboarding.js"></script>
 </body>

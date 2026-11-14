@@ -1,15 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "CleanTab",
-  "version": "0.2",
+  "name": "CleanTab: NSFW Blocker & Focus Mode",
+  "short_name": "CleanTab",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
   "incognito": "split",
-  "description": "Stay intentional online \u2014 CleanTab detects NSFW content and redirects you to focus.",
+  "description": "Pauses explicit pages and closes streaming and endless feeds while you focus. Runs on your device: no account, no server.",
   "permissions": [
     "tabs",
     "storage",
     "alarms",
     "idle",
-    "offscreen"
+    "offscreen",
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -28,32 +31,29 @@
         "shared/thresholds.js",
         "shared/scoring.js",
         "shared/pageshape.js",
+        "shared/detect.js",
+        "shared/dwell.js",
         "shared/nano.js",
         "content.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "action": {
-    "default_icon": "Assets/icon48.png",
+    "default_icon": {
+      "16": "Assets/icon16.png",
+      "32": "Assets/icon32.png",
+      "48": "Assets/icon48.png",
+      "128": "Assets/icon128.png"
+    },
     "default_popup": "popup/popup.html"
   },
   "icons": {
     "16": "Assets/icon16.png",
+    "32": "Assets/icon32.png",
     "48": "Assets/icon48.png",
     "128": "Assets/icon128.png"
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "redirect/redirect.html",
-        "onboarding/onboarding.html"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ],
   "storage": {
     "managed_schema": "managed_schema.json"
   }

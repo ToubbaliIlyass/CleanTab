@@ -1,10 +1,10 @@
 // Lock strength — everything that governs how hard CleanTab is to switch off.
 //
-// The design rule this file exists to enforce: friction on *turning the tool off* should
-// be as high as it can be, while friction on *getting past one false positive* stays
-// low. Those are different doors. "Let me through once" is deliberately cheap; the paths
-// in here are deliberately expensive. Hard-lock blockers die when a misfire on a health
-// article becomes unreachable content, so nothing here touches the per-page escape.
+// The design rule: every way of getting less protection costs something (see
+// shared/friction.js). This file holds the pieces that cost is built from: the partner's
+// passphrase, the escalating cooldown and the locked hours. A wrong block is never a dead
+// end, because a page can always be re-checked and a clean one opens; but opening a page
+// that did not check out clean goes through the same lock as everything else.
 //
 // Nothing in this file is security. A determined user with devtools open defeats any
 // client-side lock, and the only true uninstall protection is an OS-level admin policy

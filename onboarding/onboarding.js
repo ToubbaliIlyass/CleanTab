@@ -16,8 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
     { key: "sensitivity", gate: () => Boolean(state.sensitivity) },
     { key: "lock",      gate: () => lockStepSatisfied() },
     { key: "incognito", gate: () => state.incognitoResolved },
-    { key: "day",       gate: () => state.hours !== null },
+    { key: "day",       gate: () => true },
   ];
+
+  // wave on welcome, thinking while choosing, default for the settings, sprout for the
+  // optional one, happy at the end. Decorative; hidden when the window is small.
+  const OB_POSES = ["wave", "thinking", "default", "default", "sprout", "happy"];
 
   const state = {
     acknowledged: false,
@@ -29,7 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     windowEnabled: false,
     windowStart: 22,
     windowEnd: 6,
-    dwell: false,
+    dwell: true,
     nano: false,
     incognitoResolved: false,
     policyActive: false,
@@ -98,6 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
       paintMeter(state.sensitivity);
     }
     el("optStrictKid").checked = state.dwell;
+    el("optStrictKid").dataset.touched = "1"; // a choice already made is kept, not re-defaulted
     el("optNano").checked = state.nano;
     el("optPartner").checked = state.partnerEnabled;
     el("partnerPanel").style.display = state.partnerEnabled ? "" : "none";
@@ -158,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
       paintMeter(state.sensitivity);
     }
     el("optStrictKid").checked = state.dwell;
+    el("optStrictKid").dataset.touched = "1"; // a choice already made is kept, not re-defaulted
     el("optNano").checked = state.nano;
     el("optPartner").checked = state.partnerEnabled;
     el("partnerPanel").style.display = state.partnerEnabled ? "" : "none";
@@ -215,6 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ? 'Start browsing <span class="cta-arrow">→</span>'
       : 'Next <span class="cta-arrow">→</span>';
     refreshGate();
+    mountMascot(el("obMascot"), OB_POSES[index]);
 
     // Slides are focusable regions; moving focus keeps the keyboard path sane and
     // stops a hidden slide's controls from being tabbable.
@@ -305,13 +312,13 @@ document.addEventListener("DOMContentLoaded", () => {
       ? "Anything they can undo in two clicks isn't protection. These are the layers that actually hold."
       : "A blocker you can turn off in two clicks isn't a blocker. Turn on as much friction as you'll actually keep.";
     el("lockFoot").textContent = guardian
-      ? "Getting past one wrong block stays one click for them — that's deliberate, so a misfire on a school page doesn't become a reason to fight the tool."
-      : "Getting past one wrong block stays one click, whatever you turn on here.";
+      ? "A page blocked wrongly can always be checked again, and a clean one opens, so a misfire on a school page doesn't become a reason to fight the tool."
+      : "A page you think was blocked wrongly can always be checked again, whatever you turn on here.";
 
-    el("dayHeadline").textContent = guardian ? "Last question." : "One last question.";
+    el("dayHeadline").textContent = "You're set.";
     el("dayLede").textContent = guardian
-      ? "This sets the browsing floor their ring needs before a day counts. Rough is fine."
-      : "This sets the browsing floor your ring needs before a day counts. Rough is fine.";
+      ? "Here's what you turned on. Want to see what they'll see first? Try a practice pause."
+      : "Here's what you turned on. Want to see what a pause looks like first? Try a practice one.";
 
     // The guardian path recommends image scanning; the self path leaves it off.
     syncDwellControl();
@@ -377,9 +384,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const allowed = !state.sensitivity || SENSITIVITY_PROFILES[state.sensitivity].dwell;
     box.disabled = !allowed;
     if (!allowed) { box.checked = false; state.dwell = false; }
-    else if (state.mode === "guardian" && !box.dataset.touched) { box.checked = true; state.dwell = true; }
+    else if (!box.dataset.touched) { box.checked = true; state.dwell = true; }
     el("dwellSub").textContent = allowed
-      ? "Classifies pictures locally, only when you stop on one. Costs some battery."
+      ? "Checks pictures on your device, only ones you stop on. One picture never blocks a page; staying on explicit ones does. Uses some battery."
       : "Lenient turns image scanning off entirely, so this isn't available.";
   }
 
@@ -668,27 +675,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const foot = document.createElement("p");
     foot.className = "summary-foot";
-    foot.textContent = "All of this lives in the Guard tab — you can change it there.";
+    foot.textContent = "All of this lives in the Guard tab. Focus mode, for closing streaming and feeds while you work, is in the Focus tab.";
     box.appendChild(foot);
   }
 
+  // The last card previews the real ring: protected days out of the last 14, starting
+  // empty. (It used to ask how many hours you browse; that answer no longer drives anything.)
   function paintRing() {
-    const goalPct = 95;
-    el("ringPct").textContent = `${goalPct}%`;
-    el("ringFill").style.strokeDashoffset =
-      String(RING_CIRCUMFERENCE * (1 - goalPct / 100));
-    const minutes = computeInitialGoal(state.hours);
+    el("ringPct").textContent = "0";
+    el("ringFill").style.strokeDashoffset = String(RING_CIRCUMFERENCE);
     el("ringCaption").textContent =
-      `About ${minutes} minutes of browsing a day, ${goalPct}% of it clean.`;
+      "A day counts as protected when you browse a bit, don't open a flagged page anyway, and keep protection on.";
   }
 
   // ── Finish ─────────────────────────────────────────────────────────────────
 
   async function finish() {
     await storageSet({
-      selfEstimateHours: state.hours,
       enableDwellDetection: state.dwell,
-      goalMinutes: computeInitialGoal(state.hours),
       sensitivity: state.sensitivity || DEFAULT_SENSITIVITY,
       setupMode: state.mode || "self",
       partnerLockHash: state.partnerHash,
@@ -704,6 +708,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.close();
   }
 
+  // A practice pause: the real pause page, with nothing flagged and nothing saved.
+  el("tryPauseBtn").addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("redirect/redirect.html?demo=1") });
+  });
+
   // ── Restore a backup ───────────────────────────────────────────────────────
 
   const importFile = el("importFile");
@@ -718,9 +727,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = JSON.parse(ev.target.result);
         if (!data.schemaVersion) throw new Error("not a CleanTab backup");
 
+        // Whether protection is on, a running pause or focus session, and the rate
+        // limits are state, not settings: a file must never be able to switch protection
+        // off. On a device that is already set up, the lock is not restorable either;
+        // otherwise opening this page and restoring an old backup would clear a partner
+        // passphrase without the partner.
+        const never = ["enabled", "disableUntil", "cooldownUntil", "disableEvents",
+          "allowanceEvents", "pauseEvents", "focusSession", "focusSkipUntil"];
+        const lock = ["partnerLockHash", "partnerLockLabel", "lockWindow"];
+        const existing = await storageGet(["onboardingCompleted"]);
+        const skip = new Set(existing.onboardingCompleted ? [...never, ...lock] : never);
         const importable = new Set(Object.keys(getDefaults(todayLocal())));
         const clean = {};
-        for (const [k, v] of Object.entries(data)) if (importable.has(k)) clean[k] = v;
+        for (const [k, v] of Object.entries(data)) {
+          if (importable.has(k) && !skip.has(k)) clean[k] = v;
+        }
         if (clean.schemaVersion === 1) Object.assign(clean, migrateV1ToV2(clean));
         clean.onboardingCompleted = true;
 
@@ -738,10 +759,27 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Boot ───────────────────────────────────────────────────────────────────
 
   (async () => {
+    // Setup writes sensitivity and the lock, so once CleanTab is set up this page only
+    // works for a few minutes after the popup's gate was passed ("Run setup again").
+    // Typing its address is not a way round the wait, the partner or the locked hours.
+    const [{ onboardingCompleted }, { setupUnlockedUntil }] = await Promise.all([
+      storageGet(["onboardingCompleted"]), sessionGet(["setupUnlockedUntil"]),
+    ]);
+    if (onboardingCompleted && !(setupUnlockedUntil > Date.now())) {
+      document.body.innerHTML =
+        '<main style="max-width:30rem;margin:18vh auto;padding:0 24px;font:500 18px/1.5 Gabarito,system-ui,sans-serif;color:#2b1d14">' +
+        '<h1 style="font-size:32px;font-weight:900;margin:0 0 12px">CleanTab is already set up.</h1>' +
+        '<p>To change it, open the CleanTab popup, go to the Guard tab and choose <b>Run setup again</b>.</p></main>';
+      return;
+    }
     updateLockStack();
     paintMeter(null);
+    paintRing();
     const resumed = await restoreDraft();
     if (!resumed) await loadExistingSettings();
+    // Balanced is the sensible default, so the step is one click shorter. Choosing
+    // something else is still one click.
+    if (!state.sensitivity) sensPicker.querySelector('[data-sens="balanced"]')?.click();
     render();
     if (resumed) {
       // We are back; the worker no longer needs to reopen this page.

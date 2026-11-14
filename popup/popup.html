@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
+  <title>CleanTab</title>
   <link rel="stylesheet" href="../Assets/fonts/fonts.css"/>
   <link rel="stylesheet" href="popup.css"/>
+  <link rel="stylesheet" href="../Assets/theme.css"/>
 </head>
 <body>
 <div class="popup">
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toastText"></span>
+    <div class="confetti" id="confetti" aria-hidden="true"></div>
+  </div>
 
   <!-- ══════════════════════════════════════ -->
   <!--  VIEW: NORMAL (tabbed shell)           -->
@@ -37,17 +43,29 @@
           <p class="site-meta" id="siteMeta">Reading this tab…</p>
           <div class="site-actions" id="siteActions">
             <button class="site-btn" id="trustBtn">Trust site</button>
-            <button class="site-btn" id="pauseSiteBtn">Pause here</button>
+            <button class="site-btn" id="pauseSiteBtn">Skip this site</button>
+            <button class="site-btn" id="blockSiteCardBtn">Block site</button>
           </div>
           <div class="site-pause-opts" id="pauseOpts" style="display:none">
             <button class="pause-opt" data-ms="900000">15 min</button>
             <button class="pause-opt" data-ms="3600000">1 hour</button>
-            <button class="pause-opt" data-ms="today">Rest of today</button>
           </div>
         </div>
 
+        <!-- Focus, one tap from the first screen. Shows the time left once it is running. -->
+        <button class="focus-strip" id="focusStrip" type="button">
+          <span class="focus-strip-dot" aria-hidden="true"></span>
+          <span class="focus-strip-text" id="focusStripText">Focus: close streaming and feeds</span>
+          <span class="focus-strip-go" id="focusStripGo">Start 25 min</span>
+        </button>
+
+        <div class="hero">
+        <div class="mascot-col">
+          <div class="mascot mascot-hero" id="mascotRing" role="img" aria-label="CleanTab mascot"></div>
+          <p class="mascot-say" id="mascotSay"></p>
+        </div>
         <div class="ring-stage" id="ringCard">
-          <svg class="ring-svg" viewBox="0 0 140 140">
+          <svg class="ring-svg" viewBox="0 0 140 140" role="img" aria-label="Protected days out of the last 14">
             <defs>
               <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#FF6B35"/>
@@ -65,28 +83,40 @@
               stroke-linecap="round"
               filter="url(#ring-glow)"/>
           </svg>
+          <span class="ring-sticker" id="ringSticker" style="display:none">protected today</span>
           <div class="ring-center">
             <span class="ring-pct" id="ringPct">—</span>
-            <span class="ring-lbl" id="ringSub">clean today</span>
+            <span class="ring-lbl" id="ringSub">of last 14 days</span>
           </div>
         </div>
-        <p class="ring-context" id="ringContext">No browsing tracked yet today.</p>
+        </div>
+        <p class="ring-context" id="ringContext">Nothing browsed yet today.</p>
+
+        <!-- Shown only when the data says so; wording is deliberately kind. -->
+        <div class="soft-card slip" id="slipCard" style="display:none" role="status">
+          <div class="mascot mascot-slip" id="mascotSlip" aria-hidden="true"></div>
+          <span id="slipText"></span>
+        </div>
+        <div class="soft-card welcome" id="welcomeBack" style="display:none" role="status">
+          <span id="welcomeText"></span>
+        </div>
 
         <div class="paused-card" id="disableTimerCard" style="display:none">
-          <p class="paused-label">Protection paused</p>
+          <div class="mascot mascot-paused" id="mascotPaused" aria-hidden="true"></div>
+          <p class="paused-label">Protection is off</p>
           <p class="paused-timer" id="disableTimer">--:--</p>
-          <p class="paused-sub">CleanTab will auto-enable</p>
+          <p class="paused-sub">It comes back on by itself</p>
         </div>
 
         <div class="stats-row">
           <div class="stat">
             <span class="stat-n" id="closedDays">0</span>
-            <span class="stat-l">Closed days</span>
+            <span class="stat-l">Total protected</span>
           </div>
           <div class="stat-sep"></div>
           <div class="stat">
             <span class="stat-n" id="todayRedirects">0</span>
-            <span class="stat-l">Blocks today</span>
+            <span class="stat-l">Blocked today</span>
           </div>
           <div class="stat-sep"></div>
           <div class="stat">
@@ -95,6 +125,13 @@
           </div>
         </div>
 
+        <!-- Gaps in coverage the user can close. Shown only when there is one. -->
+        <button class="gap-row" id="gapRow" type="button" style="display:none">
+          <span class="gap-dot" aria-hidden="true"></span>
+          <span class="gap-text" id="gapText"></span>
+          <span class="focus-strip-go">Fix</span>
+        </button>
+
         <!-- Surfaced inline rather than behind a tab most users never clear. -->
         <div class="insight-inline" id="insightInline" style="display:none">
           <span id="insightText"></span>
@@ -102,11 +139,112 @@
 
       </div>
 
+      <!-- ── TAB: FOCUS ── -->
+      <div class="panel hidden" id="panel-focus">
+
+        <div class="focus-card" id="focusIdle">
+          <p class="focus-title">Time to focus?</p>
+          <p class="guard-desc">Streaming and endless feeds close until the timer ends. Everything else stays open.</p>
+          <div class="focus-durs" id="focusDurs"></div>
+          <div class="add-row">
+            <input class="text-input small" id="focusCustomMin" type="number" min="1" max="480"
+                   inputmode="numeric" placeholder="Or type minutes" aria-label="Focus length in minutes"/>
+            <button class="data-btn" id="focusCustomStart">Start</button>
+          </div>
+        </div>
+
+        <div class="focus-card live" id="focusLive" style="display:none" role="status">
+          <p class="paused-label" id="focusLiveLabel">Focusing</p>
+          <p class="focus-timer" id="focusTimer">--:--</p>
+          <p class="focus-until" id="focusUntil"></p>
+          <div class="focus-live-actions">
+            <button class="site-btn" id="focusAdd">+ 15 min</button>
+            <button class="site-btn" id="focusEnd">End early</button>
+            <button class="link-ish" id="focusEndCancel" style="display:none">Never mind</button>
+          </div>
+        </div>
+
+        <p class="focus-tally" id="focusTally"></p>
+
+        <div class="panel-rule"></div>
+
+        <div class="panel-section">
+          <p class="section-label">What closes</p>
+          <p class="guard-desc focus-locked" id="focusLockedNote" style="display:none">You can add to this while focusing. To remove something, end the session first.</p>
+          <label class="toggle-row">
+            <input type="checkbox" id="focusCatStreaming"/>
+            <span class="toggle-copy">
+              <span class="toggle-title">Streaming</span>
+              <span class="toggle-sub">Netflix, YouTube, Twitch, Prime Video, Disney+ and the like.</span>
+            </span>
+          </label>
+          <label class="toggle-row sub">
+            <input type="checkbox" id="focusKeepYouTube"/>
+            <span class="toggle-copy">
+              <span class="toggle-title">Keep YouTube open</span>
+              <span class="toggle-sub">For tutorials and music. Shorts still close with doom scrolling.</span>
+            </span>
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="focusCatFeeds"/>
+            <span class="toggle-copy">
+              <span class="toggle-title">Doom scrolling</span>
+              <span class="toggle-sub">TikTok, Instagram, X, Reddit, Facebook, YouTube Shorts.</span>
+            </span>
+          </label>
+
+          <p class="lock-title focus-also">Also close</p>
+          <div class="add-row">
+            <input class="text-input small" id="focusSiteInput" type="text"
+                   placeholder="news.example.com" autocomplete="off" spellcheck="false" aria-label="Site to close while focusing"/>
+            <button class="data-btn" id="focusSiteAdd">Add</button>
+          </div>
+          <div class="site-list" id="focusSiteList"></div>
+        </div>
+
+        <div class="panel-rule"></div>
+
+        <div class="panel-section">
+          <p class="section-label">Schedule</p>
+          <div class="lock-row">
+            <div class="lock-copy">
+              <p class="lock-title">Focus automatically</p>
+              <p class="lock-sub" id="focusSchedState">Off. Focus starts only when you start it.</p>
+            </div>
+            <input class="lock-check" type="checkbox" id="focusSchedToggle" aria-label="Focus automatically on a schedule"/>
+          </div>
+          <div class="lock-setup" id="focusSchedSetup" style="display:none">
+            <div class="day-chips" id="focusDays" role="group" aria-label="Days"></div>
+            <div class="hour-pair">
+              <label class="hour-field"><span>From</span><select id="focusStart"></select></label>
+              <label class="hour-field"><span>Until</span><select id="focusEndHour"></select></label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
       <!-- ── TAB: PROGRESS ── -->
       <div class="panel hidden" id="panel-progress">
 
+        <div class="plant-card">
+          <div class="plant" id="plant" data-stage="sprout" aria-hidden="true">
+            <svg viewBox="0 0 54 64" fill="none" stroke="#2b1d14" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 46h34l-4 16H14z" fill="#f6b98b"/>
+              <g class="stage s1"><path d="M27 46V34" /><path d="M27 36c-8 0-11-5-11-9 7 0 11 3 11 9z" fill="#a9c8a0"/></g>
+              <g class="stage s2"><path d="M27 34V22" /><path d="M27 30c8 0 11-5 11-9-7 0-11 3-11 9z" fill="#a9c8a0"/><path d="M27 24c-7 0-9-4-9-8 6 0 9 3 9 8z" fill="#a9c8a0"/></g>
+              <g class="stage s3"><circle cx="27" cy="14" r="6" fill="#f9d776"/><circle cx="21" cy="11" r="4" fill="#f7c9c4"/><circle cx="33" cy="11" r="4" fill="#f7c9c4"/><circle cx="27" cy="14" r="2.5" fill="#ff6b35" stroke="none"/></g>
+            </svg>
+          </div>
+          <div class="plant-copy">
+            <p class="plant-name" id="plantName">Your plant</p>
+            <p class="guard-desc" id="plantText"></p>
+          </div>
+        </div>
+
         <div class="panel-section">
           <p class="section-label">Last 16 weeks</p>
+          <p class="sr-only" id="heatSummary"></p>
           <div class="heatmap-wrap">
             <div class="day-labels">
               <span>M</span><span></span><span>W</span>
@@ -115,16 +253,24 @@
             <div class="heatmap-grid" id="heatmapGrid"></div>
           </div>
           <div class="heatmap-legend">
-            <span>Less clean</span>
-            <span class="leg-cells">
-              <span style="background:#F0EDE7"></span>
-              <span style="background:#FFE9DB"></span>
-              <span style="background:#FFD0B5"></span>
-              <span style="background:#FFAA7A"></span>
-              <span style="background:#FF6B35"></span>
-            </span>
-            <span>More</span>
+            <span class="leg-cells"><span style="background:#A9C8A0"></span></span><span>Protected</span>
+            <span class="leg-cells"><span style="background:#F7C9C4"></span></span><span>Slip</span>
+            <span class="leg-cells"><span style="background:#F1E4CC"></span></span><span>Not counted</span>
           </div>
+          <p class="guard-desc legend-key"><b>Protected:</b> you browsed and nothing got through. <b>Slip:</b> you opened a flagged page anyway, or protection was off for a while. <b>Not counted:</b> too little browsing to say either way.</p>
+        </div>
+
+        <div class="panel-section" id="recapSection">
+          <div class="recap-head"><p class="section-label">This week</p><div class="mascot mascot-recap" id="mascotRecap" aria-hidden="true"></div></div>
+          <ul class="recap-list" id="recapList"></ul>
+          <button class="data-btn" id="recapCopy">Copy summary</button>
+          <p class="guard-desc">Counts only, never sites. Share it with whoever you choose.</p>
+        </div>
+
+        <div class="panel-section">
+          <p class="section-label">Milestones</p>
+          <div class="milestones" id="milestones"></div>
+          <p class="guard-desc" id="bestRunText"></p>
         </div>
 
         <div class="panel-section" id="insightsSection" style="display:none">
@@ -150,6 +296,19 @@
             <button class="data-btn" id="addSiteBtn">Add</button>
           </div>
           <div class="site-list" id="trustedList"></div>
+        </div>
+
+        <div class="panel-rule"></div>
+
+        <div class="panel-section">
+          <p class="section-label">Blocked by you</p>
+          <p class="guard-desc">Always blocked, subdomains included. "This site is fine" cannot override these.</p>
+          <div class="add-row">
+            <input class="text-input small" id="blockSiteInput" type="text"
+                   placeholder="example.com" autocomplete="off" spellcheck="false"/>
+            <button class="data-btn" id="blockSiteBtn">Block</button>
+          </div>
+          <div class="site-list" id="userBlockedList"></div>
         </div>
 
         <div class="panel-rule"></div>
@@ -185,7 +344,7 @@
         <div class="panel-rule"></div>
 
         <div class="guard-block">
-          <p class="section-label">Image scanning</p>
+          <p class="section-label">Extra checks</p>
           <label class="toggle-row">
             <input type="checkbox" id="nanoToggle"/>
             <span class="toggle-copy">
@@ -197,8 +356,8 @@
           <label class="toggle-row">
             <input type="checkbox" id="dwellToggle"/>
             <span class="toggle-copy">
-              <span class="toggle-title">Scan images you linger on</span>
-              <span class="toggle-sub">Runs on any site, on images you stop on. Costs battery. Off while untuned.</span>
+              <span class="toggle-title">Check pictures you linger on</span>
+              <span class="toggle-sub">Only pictures you stop on, never ones you scroll past. One picture never blocks a page; staying on explicit ones does. Uses some battery.</span>
             </span>
           </label>
         </div>
@@ -207,7 +366,7 @@
 
         <div class="guard-block">
           <p class="section-label">Lock strength</p>
-          <p class="guard-desc">How hard CleanTab is to switch off. Getting past a single wrong block stays one click either way.</p>
+          <p class="guard-desc">How hard CleanTab is to switch off or loosen. A block you think is wrong can always be re-checked from the pause page.</p>
 
           <!-- Accountability partner. No server, no email: the phrase is hashed here and
                the other person simply keeps it. -->
@@ -280,27 +439,33 @@
       </div>
     </div>
 
-    <nav class="tab-bar">
-      <button class="tab active" data-tab="now">
+    <nav class="tab-bar" role="tablist" aria-label="CleanTab sections">
+      <button class="tab active" data-tab="now" role="tab" aria-selected="true" aria-controls="panel-now">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
         </svg>
         <span>Now</span>
       </button>
-      <button class="tab" data-tab="progress">
+      <button class="tab" data-tab="focus" role="tab" aria-selected="false" aria-controls="panel-focus">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>
+        </svg>
+        <span>Focus</span>
+      </button>
+      <button class="tab" data-tab="progress" role="tab" aria-selected="false" aria-controls="panel-progress">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
         <span>Progress</span>
       </button>
-      <button class="tab" data-tab="sites">
+      <button class="tab" data-tab="sites" role="tab" aria-selected="false" aria-controls="panel-sites">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18a15 15 0 010-18z"/>
         </svg>
         <span>Sites</span>
       </button>
-      <button class="tab" data-tab="guard">
+      <button class="tab" data-tab="guard" role="tab" aria-selected="false" aria-controls="panel-guard">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
         </svg>
@@ -322,7 +487,7 @@
       </div>
       <h2 class="flow-title">Disable protection?</h2>
       <p class="flow-desc" id="confirmDesc">A <strong>1-hour cooldown</strong> prevents impulsive decisions. You'll need to type a passphrase twice.</p>
-      <p class="flow-desc subtle">If you only want one site through, close this and use <strong>Pause here</strong> on the Now tab instead.</p>
+      <p class="flow-desc subtle">If you only want one site through, close this and use <strong>Skip this site</strong> on the Now tab instead.</p>
     </div>
     <div class="flow-actions">
       <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
@@ -336,6 +501,7 @@
   <!-- ══════════════════════════════════════ -->
   <div class="view view-locked">
     <div class="flow-inner">
+      <div class="mascot mascot-flow" id="mascotLocked" aria-hidden="true"></div>
       <div class="flow-icon warn">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
@@ -343,10 +509,30 @@
       </div>
       <h2 class="flow-title" id="lockedTitle">Not available right now</h2>
       <p class="flow-desc" id="lockedDetail"></p>
-      <p class="flow-desc subtle">You can still use <strong>Pause here</strong> on the Now tab for a single site, and any block still has a one-click way through.</p>
+      <p class="flow-desc subtle">A block you think is wrong can still be re-checked from the pause page. A clean page opens.</p>
     </div>
     <div class="flow-actions">
       <button class="btn btn-ghost" id="cancelLocked">Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  VIEW: LOOSEN (a wait before any setting gets weaker) -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="view view-loosen">
+    <div class="flow-inner">
+      <div class="flow-icon warn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+        </svg>
+      </div>
+      <h2 class="flow-title" id="loosenTitle">Loosen protection?</h2>
+      <p class="flow-desc" id="loosenDetail"></p>
+      <p class="flow-desc subtle">Making CleanTab stricter is always instant. Making it looser takes a breath first.</p>
+    </div>
+    <div class="flow-actions">
+      <button class="btn btn-ghost" id="loosenCancel">Keep it as it is</button>
+      <button class="btn btn-solid disabled" id="loosenConfirm" disabled>Breathe…</button>
     </div>
   </div>
 
@@ -355,6 +541,7 @@
   <!-- ══════════════════════════════════════ -->
   <div class="view view-partner">
     <div class="flow-inner">
+      <div class="mascot mascot-flow" id="mascotPartner" aria-hidden="true"></div>
       <div class="flow-icon warn">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/>
@@ -464,14 +651,20 @@
 
 </div><!-- /popup -->
 
+<script src="../Assets/mascot/mascot.js"></script>
 <script src="../shared/dates.js"></script>
 <script src="../shared/domains.js"></script>
 <script src="../shared/thresholds.js"></script>
+<script src="../shared/keywords.js"></script>
 <script src="../shared/schema.js"></script>
 <script src="../shared/migrations/v0_to_v1.js"></script>
 <script src="../shared/migrations/v1_to_v2.js"></script>
 <script src="../shared/lock.js"></script>
+<script src="../shared/friction.js"></script>
+<script src="../shared/protection.js"></script>
+<script src="../shared/focus.js"></script>
 <script src="../shared/storage.js"></script>
 <script src="popup.js"></script>
+<script src="focus-tab.js"></script>
 </body>
 </html>

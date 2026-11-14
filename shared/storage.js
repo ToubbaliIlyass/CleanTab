@@ -34,6 +34,17 @@ function sessionRemove(keys) {
   return new Promise((resolve) => chrome.storage.session.remove(keys, resolve));
 }
 
+// Read-modify-write helpers below would otherwise interleave (a block recorded while a
+// minute tick is mid-write loses one of the two updates). Calls queue within one context;
+// a failure in one never stalls the ones behind it.
+let storageQueue = Promise.resolve();
+
+function serialized(fn) {
+  const run = storageQueue.then(fn);
+  storageQueue = run.catch(() => {});
+  return run;
+}
+
 // ─── Bootstrap & migration ────────────────────────────────────────────────────
 
 async function bootstrap() {
@@ -42,7 +53,12 @@ async function bootstrap() {
 
   let state = raw;
 
-  if (!state.schemaVersion) {
+  if (!state.schemaVersion && Object.keys(raw).length === 0) {
+    // A fresh install has nothing to migrate. Running the old migrations over an empty
+    // profile stamped it with their historical defaults instead of today's.
+    state = { schemaVersion: SCHEMA_VERSION };
+    await storageSet(state);
+  } else if (!state.schemaVersion) {
     state = migrateV0ToV1(state, dateStr);
     const legacyKeys = [
       "streak", "lastStreakDay", "redirectsToday", "streakBrokenToday",
@@ -74,12 +90,21 @@ async function bootstrap() {
 
 // ─── Daily rollover ───────────────────────────────────────────────────────────
 
-async function handleDailyRollover() {
-  const data = await storageGet(["today", "totals", "history", "goalMinutes", "cleanShareGoal"]);
+function handleDailyRollover() {
+  return serialized(handleDailyRolloverLocked);
+}
+
+async function handleDailyRolloverLocked() {
+  const data = await storageGet([
+    "today", "totals", "history", "goalMinutes", "cleanShareGoal", "enabled", "disableUntil",
+  ]);
   const today = data.today || {};
   const dateStr = todayLocal();
 
   if (today.date === dateStr) return;
+  // The clock went backwards (travel west, a manual change). Keep counting on the day we
+  // have rather than archiving it and then overwriting it when the date comes round again.
+  if (today.date && today.date > dateStr) return;
 
   if (!today.date) {
     await storageSet({ today: getDefaultToday(dateStr) });
@@ -89,7 +114,9 @@ async function handleDailyRollover() {
   const history = data.history || {};
   const goal = data.goalMinutes || 120;
   const shareGoal = data.cleanShareGoal ?? 0.95;
-  const ringClosed = ringIsClosed(today, shareGoal);
+  // "ringClosed" is kept as the stored field name; it now means "protected day".
+  const state = dayState(today);
+  const ringClosed = state === "protected";
 
   history[today.date] = {
     cleanMinutes: today.cleanMinutes || 0,
@@ -99,6 +126,13 @@ async function handleDailyRollover() {
     cleanShareGoal: shareGoal,
     redirects: today.redirects || 0,
     reflections: today.reflections || 0,
+    passes: today.passes || 0,
+    pauses: today.pauses || 0,
+    offs: today.offs || 0,
+    leaves: today.leaves || 0,
+    focusMinutes: today.focusMinutes || 0,
+    focusBlocks: today.focusBlocks || 0,
+    state,
     ringClosed,
   };
 
@@ -109,7 +143,12 @@ async function handleDailyRollover() {
   if (ringClosed) totals.closedDays = (totals.closedDays || 0) + 1;
   totals.lifetimeCleanMinutes = (totals.lifetimeCleanMinutes || 0) + (today.cleanMinutes || 0);
 
-  await storageSet({ history, totals, today: getDefaultToday(dateStr) });
+  const next = getDefaultToday(dateStr);
+  // Protection that was switched off before midnight and is still off belongs to the new
+  // day too; otherwise a pause taken at 23:55 would leave tomorrow looking untouched.
+  if (data.enabled === false && data.disableUntil && data.disableUntil > Date.now()) next.offs = 1;
+
+  await storageSet({ history, totals, today: next });
 }
 
 // ─── Minute tracking ──────────────────────────────────────────────────────────
@@ -118,7 +157,14 @@ async function handleDailyRollover() {
 // scanned tab; only cleanMinutes advances when nothing was flagged. A tab we could not
 // scan (chrome://, the PDF viewer, a restricted page) advances neither — it is neutral,
 // not virtuous, and counting it was the reason the old metric meant nothing.
-async function tickMinute(clean) {
+function tickMinute(clean) {
+  return serialized(() => tickMinuteLocked(clean));
+}
+
+async function tickMinuteLocked(clean) {
+  // The rollover alarm runs every 30 minutes; without this, everything between midnight
+  // and its next firing was written into yesterday.
+  await handleDailyRolloverLocked();
   const data = await storageGet(["today", "cleanShareGoal"]);
   const today = { ...(data.today || {}) };
   const shareGoal = data.cleanShareGoal ?? 0.95;
@@ -129,7 +175,7 @@ async function tickMinute(clean) {
   // ringClosedAt records when the ring FIRST closed. The share can dip below the goal
   // again after a later block; the day still counts as closed, matching how the old
   // minute-total ring behaved once it was full.
-  if (!today.ringClosedAt && ringIsClosed(today, shareGoal)) {
+  if (!today.ringClosedAt && dayState(today) === "protected") {
     today.ringClosedAt = Date.now();
   }
 
@@ -137,9 +183,29 @@ async function tickMinute(clean) {
   return today;
 }
 
+// Bumps one of today's counters (passes, pauses, offs, leaves) — the inputs to dayState().
+function recordDayEvent(kind) {
+  return serialized(async () => {
+    await handleDailyRolloverLocked();
+    const data = await storageGet(["today"]);
+    const today = { ...(data.today || getDefaultToday(todayLocal())) };
+    today[kind] = (today[kind] || 0) + 1;
+    // A day recorded before these counters existed becomes a "new style" day from here,
+    // keeping whatever it had already earned.
+    for (const k of ["passes", "pauses", "offs", "leaves"]) today[k] = today[k] || 0;
+    await storageSet({ today });
+    return today;
+  });
+}
+
 // ─── Redirect / block log ─────────────────────────────────────────────────────
 
-async function recordBlock(domain, reason) {
+function recordBlock(domain, reason) {
+  return serialized(() => recordBlockLocked(domain, reason));
+}
+
+async function recordBlockLocked(domain, reason) {
+  await handleDailyRolloverLocked();
   const data = await storageGet(["today", "blocks"]);
 
   const today = { ...(data.today || {}) };
@@ -154,7 +220,12 @@ async function recordBlock(domain, reason) {
 
 // ─── Reflection recording ─────────────────────────────────────────────────────
 
-async function recordReflection(chip, domain) {
+function recordReflection(chip, domain) {
+  return serialized(() => recordReflectionLocked(chip, domain));
+}
+
+async function recordReflectionLocked(chip, domain) {
+  await handleDailyRolloverLocked();
   const data = await storageGet(["today", "totals", "reflections"]);
 
   const today = { ...(data.today || {}) };
@@ -189,6 +260,27 @@ async function removeTrustedSite(domain) {
   const data = await storageGet(["trustedSites"]);
   const sites = (data.trustedSites || []).filter((e) => trustEntryDomain(e) !== norm);
   await storageSet({ trustedSites: sites });
+}
+
+// ─── User blocklist ───────────────────────────────────────────────────────────
+
+async function addBlockedSite(domain) {
+  const norm = normalizeDomain(domain);
+  if (!norm) return false;
+  const data = await storageGet(["blockedSites"]);
+  const sites = data.blockedSites || [];
+  if (sites.some((e) => blockedEntryDomain(e) === norm)) return false;
+  sites.push({ domain: norm, addedAt: Date.now() });
+  await storageSet({ blockedSites: sites });
+  return true;
+}
+
+async function removeBlockedSite(domain) {
+  const norm = normalizeDomain(domain);
+  const data = await storageGet(["blockedSites"]);
+  await storageSet({
+    blockedSites: (data.blockedSites || []).filter((e) => blockedEntryDomain(e) !== norm),
+  });
 }
 
 // ─── Temporary allowances (session-only) ──────────────────────────────────────

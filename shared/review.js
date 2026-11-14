@@ -42,6 +42,17 @@ function parseImageUrls(html, pageUrl, max = REVIEW_MAX_IMAGES) {
 // Turns per-image predictions into one of three outcomes. "inconclusive" exists because a
 // client-rendered page exposes few images to a plain fetch — and answering that with a
 // clear, as the old flow did, is how a permanent bypass gets handed out by accident.
+// NSFW.js's "sexy" class is the model's catch-all for swimwear, gym photos, fashion,
+// skin-toned objects and fine art. It counts at half weight; "porn" and "hentai" count in
+// full. Used by the dwell scanner and the appeal review alike so they cannot disagree.
+const SEXY_CLASS_WEIGHT = 0.5;
+
+function predictionUnsafeScore(prediction) {
+  if (!prediction) return 0;
+  return (prediction.porn || 0) + (prediction.hentai || 0) +
+    SEXY_CLASS_WEIGHT * (prediction.sexy || 0);
+}
+
 function reviewVerdict(predictions, profile) {
   let checked = 0;
   let worst = 0;
@@ -49,10 +60,81 @@ function reviewVerdict(predictions, profile) {
   for (const p of predictions) {
     if (!p) continue;
     checked += 1;
-    worst = Math.max(worst, (p.porn || 0) + (p.hentai || 0) + (p.sexy || 0));
+    worst = Math.max(worst, predictionUnsafeScore(p));
     if (worst > profile.unsafeProb) return { verdict: "unsafe", checked, worst };
   }
 
   if (checked >= REVIEW_MIN_FOR_CLEAR) return { verdict: "safe", checked, worst };
   return { verdict: "inconclusive", checked, worst };
+}
+
+// ── The whole page, not just its pictures ─────────────────────────────────────
+//
+// A page can be explicit in words alone. So "is this block wrong?" is answered from both:
+// the page's text, run through the same rules that block pages (at the strictest
+// profile, because this is the moment someone is asking to be let through), and its
+// images. Clean means both were actually read and neither found anything.
+
+const REVIEW_MIN_TEXT = 400; // characters of readable text before "nothing found" counts
+
+function stripTags(fragment) {
+  return String(fragment || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(nbsp|amp|quot|#39|lt|gt|#x27|apos);/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Fetched HTML -> the { url, bodyText, titleTexts, envTexts } shape decidePage() takes.
+// A regex pass, not a DOM: the worker has none, and this only needs the words.
+function pageFromHtml(html, url) {
+  const source = String(html || "").slice(0, REVIEW_MAX_HTML_BYTES)
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<(script|style|noscript|template|svg)\b[\s\S]*?<\/\1>/gi, " ");
+
+  const grab = (tag, limit) => {
+    const out = [];
+    const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi");
+    for (const m of source.matchAll(re)) {
+      const text = stripTags(m[1]);
+      if (text && text.length <= 300) out.push(text);
+      if (out.length >= limit) break;
+    }
+    return out;
+  };
+
+  const title = stripTags((source.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]);
+  const headings = [...grab("h1", 20), ...grab("h2", 30), ...grab("h3", 30)];
+  const links = grab("a", 400);
+  const body = (source.match(/<body[^>]*>([\s\S]*)/i) || [null, source])[1];
+
+  return {
+    url,
+    bodyText: stripTags(body),
+    titleTexts: [title, ...headings, ...links].filter(Boolean).slice(0, 50),
+    envTexts: [...headings, ...links, ...grab("button", 100), ...grab("span", 800), ...grab("label", 100)],
+  };
+}
+
+// "clean" | "flagged" | "unclear", with a sentence for the pause page.
+//   textDecision  decidePage() result for the fetched page
+//   textLength    how much readable text there was
+//   images        reviewVerdict() result
+function fullReviewVerdict(textDecision, textLength, images) {
+  if (images.verdict === "unsafe") {
+    return { verdict: "flagged", reason: "The pictures on this page were flagged." };
+  }
+  if (textDecision && textDecision.block) {
+    return { verdict: "flagged", reason: "The words on this page were flagged." };
+  }
+  if (textLength < REVIEW_MIN_TEXT || images.verdict !== "safe") {
+    return {
+      verdict: "unclear",
+      reason: "There wasn't enough on this page to check. It may load its content after opening.",
+    };
+  }
+  return {
+    verdict: "clean",
+    reason: `Checked the text and ${images.checked} picture${images.checked === 1 ? "" : "s"}. Nothing flagged.`,
+  };
 }

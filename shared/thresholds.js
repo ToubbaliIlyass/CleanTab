@@ -9,7 +9,9 @@ const SENSITIVITY_PROFILES = {
   strict: {
     label: "Strict",
     blurb: "Blocks on weaker signals. More false positives.",
-    urlScore: 3,
+    // 4.5 is one medium-confidence word typed into a search (3 x 1.5). It used to be 3,
+    // which let a single weak word ("blue tits", "ford escort") block a search.
+    urlScore: 4.5,
     titleScore: 4,
     textScore: 2,
     envScore: 4,

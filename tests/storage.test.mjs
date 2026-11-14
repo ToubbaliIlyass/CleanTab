@@ -13,6 +13,20 @@ export default async function () {
     return env;
   }
 
+  // Without serialization these interleave (both read the same `today`) and one update is
+  // lost — a block recorded during a minute tick, for example.
+  await t("concurrent counter writes do not lose updates", async () => {
+    const e = await fresh();
+    await e.runAsync(`
+      await Promise.all([
+        tickMinute(true), recordBlock("a.com", "r"), tickMinute(true),
+        recordBlock("b.com", "r"), tickMinute(false),
+      ]);
+    `);
+    const today = e.local._store.today;
+    eq([today.browsedMinutes, today.cleanMinutes, today.redirects], [3, 2, 2]);
+  });
+
   // ── Trust ──────────────────────────────────────────────────────────────────
   await t("adds a trusted site", async () => {
     const e = await fresh();
@@ -137,7 +151,7 @@ export default async function () {
 
   await t("ringClosedAt is not set before the floor", async () => {
     const e = await fresh();
-    await e.runAsync(`for (let i = 0; i < 10; i++) await tickMinute(true);`);
+    await e.runAsync(`for (let i = 0; i < 9; i++) await tickMinute(true);`);
     notOk(e.local._store.today.ringClosedAt);
   });
 

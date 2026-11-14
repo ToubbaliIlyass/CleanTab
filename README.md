@@ -27,11 +27,13 @@ This project is completely free and open for anyone who wants to reclaim their a
 
 ## ✨ Features
 
-- 🔍 **Smart Detection** — scores page text, titles and links; optionally classifies images you linger on.  
+- 🔍 **Smart Detection** — scores page text, titles and links, and checks pictures you linger on (never ones you scroll past; one picture alone never blocks a page).  
 - 🎚 **Three sensitivity levels** — tune how much signal it needs before blocking, instead of turning it off.  
-- 🚫 **A pause, not a wall** — every block offers a one-time pass or a reviewed, revocable trust entry.  
+- 🚫 **Friction where it counts** — a block you think is wrong can be re-checked (words and pictures, on your device) and a clean page opens. Opening a page that does not check out waits first, counts against the day, and respects your lock. Nothing gets looser on a click; getting stricter is instant. You can also block sites yourself.  
+- 🌱 **Forgiving progress** — a ring and a plant that count how many of the last 14 days were protected. A slip lowers it by one; nothing resets to zero.  
+- 🎯 **Focus mode** — close streaming (Netflix, YouTube, Twitch…) and endless feeds (TikTok, Instagram, X, Reddit, Shorts…) for 25, 50 or 90 minutes, or on a weekly schedule. Any closed site can be opened for five minutes, three times a day, and focus never counts against your protected days.  
 - 📋 **Nothing hidden** — every trusted site is listed and removable; the popup shows what's happening on the current tab.  
-- 🧩 **Genuinely offline** — model weights and fonts ship with the extension. No servers, no analytics, no external requests.  
+- 🧩 **Local-first** — model weights and fonts ship with the extension. No CleanTab servers, no analytics, no accounts. The only requests it makes are to the sites you are already visiting: fetching an image you dwelled on, or re-fetching a blocked page when you ask it to review that site.  
 - 🧘 **Mindful Interface** — clean design, gentle feedback, and focus reminders.  
 - ❤️ **Open Source** — contribute, customize, and make it yours.
 
@@ -39,11 +41,10 @@ This project is completely free and open for anyone who wants to reclaim their a
 
 ## 🧭 How It Works
 
-1. CleanTab monitors the currently active browser tab.  
-2. When content is detected as NSFW or flagged by pattern rules (image analysis, keywords, or page context), it blocks and redirects.  
-3. The redirect page reminds you to take a deep breath, refocus, or read a motivational quote.  
-
-You can customize detection rules and redirect destinations easily.
+1. CleanTab reads the page you open, on your device.  
+2. When it looks explicit (a known adult site, the page's own text and links, or optionally the images you linger on), the tab is replaced with a pause screen.  
+3. The pause screen asks what's going on, offers a breath, and always has a way through if the block was wrong.  
+4. During a focus session, streaming and feed sites get the same screen with the time left instead.
 
 ---
 
@@ -55,7 +56,7 @@ You can customize detection rules and redirect destinations easily.
 ## ⚙️ Tech Stack
 
 - **Manifest v3** (Chrome Extension)  
-- **JavaScript / TypeScript**  
+- **JavaScript** (no build step)  
 - **HTML + CSS** (Popup + Redirect Page)  
 - **Local Storage API** for settings  
 - **NSFW.js + TensorFlow.js** bundled locally (MobileNetV2, ~2.7 MB) in an offscreen document  
@@ -64,12 +65,12 @@ You can customize detection rules and redirect destinations easily.
 
 ## 💬 Future Plans
 
-- [ ] Machine learning–based detection  
-- [ ] Custom redirect pages or quotes  
-- [ ] Focus timer integration  
+- [ ] SafeSearch / Restricted Mode enforcement  
+- [ ] A remote code for accountability partners (no server)  
 - [ ] Cross-browser support (Firefox, Edge)  
 - [ ] Community-submitted “clean lists”  
-- [ ] Lightweight, privacy-safe analytics to measure impact *(no user tracking)*  
+
+There are no analytics and none are planned.
 
 ---
 
@@ -87,14 +88,14 @@ Your support helps me keep improving CleanTab — and helps others find clarity 
 
 ## 📜 License
 
-MIT License © 2025 [**Ilyass Toubbali**](https://github.com/ilyasstoubbali)  
+MIT License © 2025 [**Ilyass Toubbali**](https://github.com/ToubbaliIlyass)  
 Feel free to use, modify, and share with credit.
 
 ---
 
 ## 🌐 Links
 
-- 💻 [**GitHub Repo: CleanTab**](https://github.com/ilyasstoubbali/CleanTab)  
+- 💻 [**GitHub Repo: CleanTab**](https://github.com/ToubbaliIlyass/CleanTab)  
 - 📬 **Contact:** toubbaliilyasse@gmail.com 
 - 📸 [**Instagram: @ilyasstoubbali**](https://instagram.com/ilyasstoubbali)  
 

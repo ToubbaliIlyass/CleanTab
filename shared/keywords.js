@@ -4,7 +4,6 @@ const keywordWeights = {
   nsfw: 5,
   xxx: 5,
   hentai: 5,
-  hardcore: 5,
   bdsm: 5,
   blowjob: 5,
   pornhub: 5,
@@ -21,31 +20,37 @@ const keywordWeights = {
   handjob: 5,
   titjob: 5,
   rimjob: 5,
-  fingering: 5,
   camgirl: 5,
   camgirls: 5,
   milf: 5,
   rule34: 5,
-  orgy: 5,
   striptease: 5,
 
   // Medium confidence (3 points)
+  //
+  // Words that are explicit in one context and ordinary in another are kept BELOW the
+  // blocking threshold on their own: "hardcore" (a gamer, a punk band), "fingering"
+  // (piano, guitar), "orgy" ("an orgy of colour"). They still add to a page that has
+  // other signals.
+  hardcore: 3,
+  fingering: 3,
+  orgy: 3,
   nude: 3,
   sex: 3,
-  explicit: 3,
+  explicit: 2,
   "18+": 3,
   onlyfans: 3,
   lewd: 3,
-  cam: 3,
-  cams: 3,
+  cam: 2,
+  cams: 2,
   // Word-boundary anchored, so "nudes" needs its own entry — \bnude\b does not match it.
   nudes: 3,
   naked: 3,
-  tits: 3,
+  tits: 2,
   titties: 3,
   boobs: 3,
-  pussy: 3,
-  cocks: 3,
+  pussy: 2,
+  cocks: 2,
   anal: 3,
   erotic: 3,
   erotica: 3,
@@ -53,16 +58,16 @@ const keywordWeights = {
   masturbate: 3,
   masturbating: 3,
   masturbation: 3,
-  escort: 3,
-  escorts: 3,
+  escort: 2,
+  escorts: 2,
   stripper: 3,
   strippers: 3,
   dildo: 3,
-  twerk: 3,
+  twerk: 2,
 
   // Low confidence (2 points)
   sexy: 2,
-  thirst: 2,
+  thirst: 1,
   fuck: 2,
   horny: 2,
   lingerie: 2,
@@ -100,12 +105,29 @@ const keywordRegexes = Object.entries(keywordWeights).map(([keyword, weight]) =>
   weight,
 }));
 
+// Low-confidence words (weight under 3) are everyday vocabulary on shopping, fashion and
+// lifestyle pages: "sexy dress", "bikini sale". However many of them appear they are
+// worth at most this much in total, so a pile of weak words can never add up to a block.
+const WEAK_TIER_CAP = 2;
+
 function getKeywordScore(text) {
   let score = 0;
+  let weak = 0;
   for (const { regex, weight } of keywordRegexes) {
     if (regex.test(text)) {
-      score += weight;
+      if (weight < 3) weak += weight;
+      else score += weight;
     }
   }
-  return score;
+  return score + Math.min(weak, WEAK_TIER_CAP);
+}
+
+// Exact or subdomain match against the built-in list (m.pornhub.com, not just pornhub.com).
+function isKnownAdultDomain(hostname) {
+  const host = String(hostname || "").toLowerCase().replace(/^www\./, "");
+  if (!host) return false;
+  for (const d of knownAdultDomains) {
+    if (host === d || host.endsWith("." + d)) return true;
+  }
+  return false;
 }

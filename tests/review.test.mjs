@@ -89,7 +89,7 @@ export default async function () {
   t("reports the worst score seen", () => ok(verdict([SAFE, EXPLICIT]).worst > 0.9));
 
   // A stricter profile flags what balanced lets pass.
-  const BORDERLINE = { neutral: 0.45, drawing: 0.05, porn: 0.2, hentai: 0.1, sexy: 0.2 };
+  const BORDERLINE = { neutral: 0.45, drawing: 0.05, porn: 0.3, hentai: 0.1, sexy: 0.2 };
   t("borderline: balanced clears, strict flags", () => {
     const b = run(`reviewVerdict(${JSON.stringify([BORDERLINE, BORDERLINE, BORDERLINE])}, getProfile("balanced")).verdict`);
     const s = run(`reviewVerdict(${JSON.stringify([BORDERLINE, BORDERLINE, BORDERLINE])}, getProfile("strict")).verdict`);
