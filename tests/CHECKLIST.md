@@ -275,6 +275,19 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 
 ---
 
+## 15 — Weekly report
+
+| # | Test | Expected | ✓ |
+|---|------|----------|---|
+| 15.1 | Fresh install | No report row on the Now tab | |
+| 15.2 | After 7 days of use (or with a week of seeded history) | "Your first week is ready" on the Now tab; it opens the report | |
+| 15.3 | Read the report top to bottom | Numbers match the Progress heatmap and the Now tab; nothing is cut off; scrolls smoothly | |
+| 15.4 | Press Done | Row disappears; it comes back seven days later as "Your week is ready" | |
+| 15.5 | Progress → See the full week | Opens the same report at any time | |
+| 15.6 | Copy summary, paste somewhere | Counts only, no site names | |
+
+---
+
 ## 14 — Friction
 
 | # | Test | Expected | ✓ |
@@ -329,6 +342,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 12 — Managed policy | / 9 | | |
 | 13 — Focus mode | / 11 | | |
 | 14 — Friction | / 10 | | |
+| 15 — Weekly report | / 6 | | |
 
 **129 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 

@@ -390,3 +390,70 @@ body { background: var(--wall); }
 
 .legend-key { margin-top: 8px; font-size: 11px; line-height: 1.45; }
 .legend-key b { font-weight: 700; color: var(--ink); }
+
+/* ── Weekly report ──────────────────────────────────────────────────── */
+.report-strip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: 2.5px solid var(--ink);
+  border-radius: 12px; background: var(--butter); box-shadow: 2px 2px 0 var(--ink); cursor: pointer; font-family: var(--ff-b); color: var(--ink); text-align: left;
+  transition: transform .12s ease-out, box-shadow .12s ease-out; }
+.report-strip:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+.report-strip-star { font-size: 12px; line-height: 1; color: var(--coral); }
+/* The report strip takes the idle focus strip's place for the week it is due. */
+#panel-now:has(#reportStrip:not([style*="none"])) .focus-strip:not(.on) { display: none; }
+.recap-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.view-report { background: var(--paper); }
+.report-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 8px; display: flex; flex-direction: column; gap: 16px; }
+.report-scroll > * { flex-shrink: 0; }
+.report-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.report-title { font-family: var(--ff-d); font-size: 30px; font-weight: 900; letter-spacing: -.03em; line-height: 1; color: var(--ink); margin-top: 4px; }
+.mascot-report { width: 78px; height: 78px; flex: 0 0 auto; margin-top: -6px; }
+.mascot-report svg { width: 100%; height: 100%; }
+.report-headline { font-family: var(--ff-hand); font-size: 21px; line-height: 1.15; color: var(--ink); margin-top: -8px; }
+
+.report-card { padding: 14px; border: 2.5px solid var(--ink); border-radius: 16px; background: #fff; box-shadow: var(--stk); }
+.report-hero { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.report-big { font-family: var(--ff-d); font-size: 58px; font-weight: 900; line-height: .85; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.report-big-of { font-family: var(--ff-mono); font-size: 11px; line-height: 1.3; color: var(--text2); }
+.report-mid { font-family: var(--ff-d); font-size: 26px; font-weight: 900; letter-spacing: -.02em; line-height: 1; color: var(--ink); }
+.report-delta { font-size: 10.5px; font-weight: 700; color: var(--text2); white-space: nowrap; }
+.report-delta:empty { display: none; }
+.report-delta.good { color: var(--sage-d); }
+.report-hero .report-delta, .report-focus .report-delta { margin-left: auto; padding: 3px 8px; border-radius: 99px; background: var(--cream); }
+.report-hero .report-delta.good, .report-focus .report-delta.good { background: #dcebd6; }
+
+.report-days { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 14px 0 0; padding: 0; }
+.report-day { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.report-day-dot { width: 100%; aspect-ratio: 1; max-width: 34px; border-radius: 10px; border: 2.5px solid var(--ink); background: #f1e4cc; }
+.report-day.protected .report-day-dot { background: var(--sage); }
+.report-day.slip .report-day-dot { background: var(--blush); }
+.report-day.notCounted .report-day-dot { border-style: dashed; border-color: rgba(43, 29, 20, .35); }
+.report-day.today .report-day-dot { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--coral); }
+.report-day-l { font-family: var(--ff-mono); font-size: 10px; color: var(--text2); }
+.report-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-size: 10.5px; color: var(--text2); }
+.report-key .k { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--ink); margin-left: 6px; }
+.report-key .k:first-child { margin-left: 0; }
+.report-key .k.protected { background: var(--sage); } .report-key .k.slip { background: var(--blush); }
+.report-key .k.notCounted { background: #f1e4cc; border-style: dashed; }
+
+.report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.report-tile { display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border: 2.5px solid var(--ink); border-radius: 14px; background: var(--cream); }
+.report-tile b { font-family: var(--ff-d); font-size: 26px; font-weight: 900; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.report-tile-l { font-family: var(--ff-mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--text2); }
+.report-note { margin-top: 8px; font-size: 12px; line-height: 1.45; color: var(--text2); }
+.report-note:empty { display: none; }
+
+.report-focus { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.report-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 96px; margin-top: 8px; }
+.report-bar { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.report-bar-n { height: 12px; font-family: var(--ff-mono); font-size: 9.5px; color: var(--text2); }
+.report-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.report-bar-track i { display: block; width: 100%; border: 2.5px solid var(--ink); border-radius: 7px 7px 3px 3px; background: var(--coral); }
+.report-bars.focus .report-bar-track i { background: var(--sage); }
+.report-bar-track i.empty { border: 0; border-top: 2.5px dashed rgba(43, 29, 20, .3); border-radius: 0; background: none; }
+.report-bar-l { font-family: var(--ff-mono); font-size: 10px; color: var(--text2); }
+
+.report-patterns { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 7px; }
+.report-patterns li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.4; color: var(--ink); }
+.report-patterns li::before { content: ""; position: absolute; left: 0; top: .42em; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--ink); background: var(--butter); }
+.report-foot { font-size: 11px; line-height: 1.45; color: var(--text2); text-align: center; padding-bottom: 6px; }
+#reportFeelings { margin-top: 8px; }

@@ -34,6 +34,12 @@ const BUNDLES = {
     "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js",
     "shared/protection.js", "shared/focus.js", "shared/storage.js", "popup/focus-tab.js",
   ],
+  "popup report": [
+    "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/keywords.js", "shared/schema.js",
+    "shared/lock.js", "shared/friction.js",
+    "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js",
+    "shared/protection.js", "shared/focus.js", "shared/report.js", "shared/storage.js", "popup/report-view.js",
+  ],
   "redirect": [
     "shared/dates.js", "shared/domains.js", "shared/allowance.js",
     "shared/thresholds.js", "shared/schema.js",
@@ -185,7 +191,7 @@ export default async function () {
     "shared/scoring.js", "shared/pageshape.js", "shared/detect.js", "shared/dwell.js", "shared/nano.js", "shared/allowance.js",
     "shared/review.js", "shared/schema.js", "shared/lock.js", "shared/friction.js",
     "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js", "shared/protection.js", "shared/focus.js",
-    "shared/toolbar.js", "shared/storage.js",
+    "shared/report.js", "shared/toolbar.js", "shared/storage.js",
   ];
   const ALL_SHARED = new Set(SHARED_FILES.flatMap(declarationsIn));
 

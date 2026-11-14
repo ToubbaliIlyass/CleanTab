@@ -150,3 +150,10 @@ The rule, written down in `shared/friction.js`: every way of getting less protec
 ## Days: three things instead of four
 - The heatmap and the Now tab show **Protected**, **Slip** and **Not counted**. "Passed through" and "Switched off" were two names for the same thing from the user's side, so both are a slip now, in one colour, with a line under the legend saying what each means.
 - A fresh install no longer runs the old migrations over an empty profile (that was silently giving new users pre-1.0 defaults).
+
+## Weekly report
+- After seven days of use, and then once a week, a "Your week is ready" row appears on the Now tab. It can also be opened any time from Progress ("See the full week").
+- The report shows: protected days out of 7 with a square for each day; what happened at the pause screen (blocked, walked away, opened anyway, reflections); pages blocked day by day; focus time with a bar for each day; patterns (hardest day, the time of day most of it happens, slips against the week before, longest run); the feelings picked that week, with the plan written for the most common one.
+- Every number is compared with the week before when there is one. A change in the welcome direction is green; the other direction is plain text, never red.
+- "Copy summary" gives counts only, never sites. "Done" hides the row for a week.
+- It reads what is already stored on the device: no new permission, nothing sent anywhere.
