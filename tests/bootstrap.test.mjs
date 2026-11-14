@@ -10,7 +10,7 @@ export default async function () {
     eq(e.local._store.schemaVersion, 2);
     eq(e.local._store.trustedSites, []);
     eq(e.local._store.sensitivity, "balanced");
-    eq(e.local._store.enableDwellDetection, false);
+    eq(e.local._store.enableDwellDetection, true);
     ok(e.local._store.today.date);
   });
 

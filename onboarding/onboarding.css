@@ -883,3 +883,104 @@ html, body {
 }
 
 .link-btn.small { font-size: 11.5px; margin-top: 2px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Layout v2: one fixed-height card, centred, that never scrolls the page.
+
+   The shell is the card. Progress sits in its top bar, the step fills the middle, and
+   the buttons are pinned to its bottom edge. Everything is sized with clamp()/vh so a
+   step fits at 1024x640 as well as 1440x900; only if a step genuinely cannot fit does
+   its own area scroll, never the page. Narrow or short windows drop the decorative
+   preview (it repeats what the copy says) before they drop any control.
+   ══════════════════════════════════════════════════════════════════════ */
+
+html, body { height: 100%; min-height: 100dvh; overflow: hidden; }
+body {
+  display: grid;
+  place-items: center;
+  padding: clamp(8px, 2.4vh, 28px) clamp(8px, 2.4vw, 32px);
+}
+
+.shell {
+  width: min(1080px, 100%);
+  height: min(780px, 100%);
+  min-height: 0;
+  background: var(--bg);
+  border: 3px solid var(--border);
+  border-radius: clamp(16px, 2.4vh, 26px);
+  box-shadow: 6px 6px 0 var(--border);
+  overflow: hidden;
+}
+
+.topbar { padding: clamp(8px, 1.6vh, 14px) clamp(14px, 2.4vw, 28px); gap: clamp(10px, 2vw, 24px); }
+.progress { max-width: none; }
+.viewport { min-height: 0; }
+
+.slide {
+  padding: clamp(10px, 2vh, 26px) clamp(16px, 3vw, 40px);
+  overflow-x: hidden;
+  /* Only if a step truly cannot fit; the page itself never scrolls. */
+  overflow-y: auto;
+}
+.shell .card {
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.slide-grid { gap: clamp(20px, 4vw, 56px); }
+.col-copy { gap: clamp(6px, 1.2vh, 12px); }
+.headline { font-size: clamp(24px, 4.6vh, 42px); }
+.lede { font-size: clamp(13px, 1.9vh, 15px); line-height: 1.5; }
+.facts { gap: clamp(5px, 1vh, 9px); }
+.facts li { font-size: clamp(12.5px, 1.8vh, 13.5px); line-height: 1.45; }
+.ack { padding: clamp(8px, 1.3vh, 13px) 14px; }
+.pick { padding: clamp(6px, 1.1vh, 12px) 14px; }
+.picker { gap: clamp(6px, 1vh, 10px); }
+.option-list { gap: clamp(6px, 1vh, 10px); }
+.option { padding: clamp(6px, 1vh, 11px) 14px; }
+.slide { padding-top: clamp(14px, 2.4vh, 30px); }
+
+.navbar { padding: clamp(8px, 1.6vh, 14px) clamp(14px, 2.4vw, 28px); }
+
+/* The preview column is decoration. Drop it when height or width is tight. */
+@media (max-height: 800px) {
+  .col-visual { display: none; }
+  .slide-grid { grid-template-columns: minmax(0, 1fr); max-width: 680px; margin: 0 auto; }
+}
+@media (max-width: 900px) {
+  .col-visual { display: none; }
+  .slide-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .topbar, .navbar { padding-left: 14px; padding-right: 14px; }
+  .slide { padding: 12px 16px; }
+}
+@media (max-width: 520px) {
+  .step-count { display: none; }
+  .nav-right { gap: 10px; }
+  #importLink { display: none; }
+}
+@media (max-height: 700px) {
+  .headline { font-size: clamp(22px, 4.2vh, 30px); }
+  .lede { display: none; }
+  .pick-sub, .option-sub { font-size: 11.5px; line-height: 1.35; }
+}
+
+/* The final step's summary is information, not decoration: it stays when the other
+   previews go, and the ring graphic gives way to it. */
+.col-copy > .ghost-btn { align-self: flex-start; }
+@media (max-height: 800px), (max-width: 900px) {
+  .slide[data-step="5"] .col-visual { display: flex; }
+  .slide[data-step="5"] .ring,
+  .slide[data-step="5"] .ring-center,
+  .slide[data-step="5"] .ring-caption,
+  .slide[data-step="5"] .ring-foot { display: none; }
+  .slide[data-step="5"] .ring-card { max-width: none; width: 100%; padding: 12px 14px; }
+  .slide[data-step="5"] .summary { margin-top: 0; }
+  .slide[data-step="5"] .slide-grid { max-width: 680px; }
+}
+@media (max-height: 800px), (max-width: 900px) {
+  .slide[data-step="5"] .ring-card { border: 0; box-shadow: none; padding: 0; background: transparent; }
+  .slide[data-step="5"] .summary { padding: 12px 16px; }
+}

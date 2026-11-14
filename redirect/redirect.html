@@ -11,11 +11,13 @@
   <link rel="icon" type="image/png" sizes="128x128" href="../Assets/icon128.png"/>
   <link rel="stylesheet" href="../Assets/fonts/fonts.css"/>
   <link rel="stylesheet" href="redirect.css"/>
+  <link rel="stylesheet" href="../Assets/theme.css"/>
 </head>
 <body>
 
   <!-- Breathing overlay -->
   <div class="breath-overlay" id="breathOverlay">
+<div class="mascot mascot-breath" id="mascotBreath" aria-hidden="true"></div>
     <div class="breath-orb" id="breathOrb"></div>
     <p class="breath-word" id="breathWord">Breathe in</p>
     <button class="breath-skip" id="breathSkip">Skip</button>
@@ -29,19 +31,22 @@
 
     <main class="main">
       <div class="copy">
-        <h1 class="pause">Pause.</h1>
+        <div class="mascot mascot-pause" id="mascotPause" aria-hidden="true"></div>
+        <h1 class="pause" id="pauseTitle">Pause.</h1>
         <p class="reason" id="reason-text">This page was flagged.</p>
+        <p class="focus-left" id="focusLeft" style="display:none" role="status"></p>
+        <p class="demo-note" id="demoNote" style="display:none">Practice pause. Nothing was flagged, and nothing here is saved.</p>
       </div>
 
       <div class="rule"></div>
 
-      <div class="reflect">
+      <div class="reflect" id="reflectBox">
         <!-- First-time note (shown once) -->
         <p class="first-note" id="firstTimeNote" style="display:none">
           Pick what fits — only you ever see this.
         </p>
 
-        <p class="reflect-q">What's actually going on right now?</p>
+        <p class="reflect-q">What's going on right now? <span class="opt">Optional.</span></p>
 
         <div class="chips" id="chips">
           <button class="chip" data-chip="bored">Bored</button>
@@ -50,6 +55,8 @@
           <button class="chip" data-chip="avoiding">Avoiding something</button>
           <button class="chip" data-chip="lonely">Lonely</button>
           <button class="chip" data-chip="tired">Tired</button>
+          <button class="chip" data-chip="curious">Just curious</button>
+          <button class="chip" data-chip="unsure">Not sure</button>
         </div>
 
         <div class="logged" id="chipLogged" style="display:none">
@@ -63,34 +70,57 @@
           <p class="nudge-text" id="nudgeText"></p>
           <button class="nudge-breathe" id="nudgeBreathe" style="display:none">Take a beat →</button>
         </div>
+
+        <!-- An if-then plan, optional and stored on this device only. Shown back the next
+             time the same feeling brings you here. -->
+        <div class="plan" id="planBox" style="display:none">
+          <label class="plan-label" for="planInput">Next time I feel this, I will…</label>
+          <div class="plan-row">
+            <input class="plan-input" id="planInput" type="text" maxlength="80"
+                   placeholder="step outside for five minutes" autocomplete="off"/>
+            <button class="sec-btn" id="planSave">Save</button>
+          </div>
+        </div>
       </div>
 
-      <div class="rule"></div>
+      <div class="rule" id="reflectRule"></div>
 
       <div class="secondary">
-        <button class="sec-btn" id="breatheBtn">Take a beat</button>
+        <button class="sec-btn leave" id="leaveBtn">Close this and move on</button>
         <span class="sec-sep">·</span>
+        <button class="sec-btn" id="breatheBtn">Take a beat</button>
+        <span class="sec-sep" id="wrongSep">·</span>
         <button class="sec-btn" id="wrongBtn">This was wrongly flagged</button>
       </div>
 
-      <!-- Escape hatches. Revealed only after "wrongly flagged", so the default path
-           stays the pause rather than the way around it. -->
+      <!-- A wrong block is answered by checking the page again, not by taking the reader's
+           word for it. Opening a page that did not check out clean is possible, and costs. -->
       <div class="escape" id="escapeBox" style="display:none">
-        <button class="escape-btn" id="allowOnceBtn">
-          <span class="escape-title">Let me through once</span>
-          <span class="escape-sub" id="allowOnceSub">This page only, 10 minutes. Nothing saved.</span>
+        <button class="escape-btn" id="checkBtn">
+          <span class="escape-title">Check this page</span>
+          <span class="escape-sub" id="checkSub">CleanTab re-reads its words and pictures, on your device. If it's clean, it opens and today stays protected.</span>
         </button>
         <button class="escape-btn" id="trustSiteBtn">
           <span class="escape-title">This site is fine</span>
-          <span class="escape-sub" id="trustSiteSub">Check its images and trust it from now on.</span>
+          <span class="escape-sub" id="trustSiteSub">The same check. If it's clean, the site is trusted from now on.</span>
         </button>
+        <div class="anyway" id="anywayBox" style="display:none">
+          <p class="anyway-text" id="anywayText"></p>
+          <input class="plan-input" id="anywayPartner" type="password" style="display:none"
+                 placeholder="Your partner's passphrase" autocomplete="off" aria-label="Your partner's passphrase"/>
+          <button class="escape-btn" id="allowOnceBtn" disabled>
+            <span class="escape-title">Open it anyway</span>
+            <span class="escape-sub" id="allowOnceSub"></span>
+          </button>
+        </div>
       </div>
 
-      <div class="appeal-result" id="appeal-status"></div>
+      <div class="appeal-result" id="appeal-status" role="status" aria-live="polite"></div>
 
     </main>
   </div>
 
+  <script src="../Assets/mascot/mascot.js"></script>
   <script src="../shared/dates.js"></script>
   <script src="../shared/domains.js"></script>
   <script src="../shared/allowance.js"></script>
@@ -98,7 +128,9 @@
   <script src="../shared/schema.js"></script>
   <script src="../shared/migrations/v0_to_v1.js"></script>
   <script src="../shared/migrations/v1_to_v2.js"></script>
-  <script src="../shared/storage.js"></script>
+  <script src="../shared/protection.js"></script>
+  <script src="../shared/focus.js"></script>
+<script src="../shared/storage.js"></script>
   <script src="redirect.js"></script>
 </body>
 </html>

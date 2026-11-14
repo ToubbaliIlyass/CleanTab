@@ -156,9 +156,12 @@ Each tick is 1 minute. Run these while doing something else.
 
 | # | Test | Expected | ✓ |
 |---|------|----------|---|
-| 6.1 | Idle 5 min | **Neither** `cleanMinutes` nor `browsedMinutes` moves | |
+| 6.1 | Idle 10 min | Counting stops after 5 minutes without input; **neither** counter moves after that | |
+| 6.1b | Stay on one page for 10 min, moving the mouse now and then | `browsedMinutes` rises by about 10 (it used to stop at 2) | |
+| 6.1c | Same, but with another app in front of Chrome | Neither counter moves | |
 | 6.2 | 5 min on `chrome://extensions` | Neither moves — no verdict is neutral, not virtuous | |
-| 6.3 | Rollover | Set the system clock forward a day → within 30 min the day archives, `closedDays` increments if closed, today resets | |
+| 6.3 | Rollover | Set the system clock forward a day → open the popup: the day archives at once, `closedDays` increments if protected, today resets | |
+| 6.4 | Protected today | With 10+ browsed minutes and no pass or pause, "Protected days" on the Now tab includes today | |
 
 ---
 
@@ -272,6 +275,41 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 
 ---
 
+## 14 — Friction
+
+| # | Test | Expected | ✓ |
+|---|------|----------|---|
+| 14.1 | On a wrongly blocked ordinary page: "This was wrongly flagged" → "Check this page" | Page reopens within a few seconds; today's `passes` does not move | |
+| 14.2 | Same on a page that is explicit in text only | "The words on this page were flagged." "Open it anyway" appears, disabled, counting down from 30 | |
+| 14.3 | Use "Open it anyway" twice in one day | Second wait is 60 s; the day shows as passed | |
+| 14.4 | Visit a site on the adult list | No "wrongly flagged" button; trusting or skipping it from the popup is refused | |
+| 14.5 | Trust a site, skip a site, unblock a site, pick a looser sensitivity, untick picture checking | Each shows the 30 s "Breathe…" screen first; "Keep it as it is" changes nothing | |
+| 14.6 | Pick a stricter sensitivity, block a site, remove a trusted site | Instant | |
+| 14.7 | With a partner set, repeat 14.5 | Partner passphrase is asked instead of the wait | |
+| 14.8 | During locked hours, repeat 14.2 and 14.5 | "Open it anyway" and every loosening are refused | |
+| 14.9 | Paste the setup page's address into a tab | "CleanTab is already set up." Nothing else on the page | |
+| 14.10 | Incognito access off | Now tab shows "Incognito windows aren't covered yet" | |
+
+---
+
+## 13 — Focus mode
+
+| # | Test | Expected | ✓ |
+|---|------|----------|---|
+| 13.1 | Focus tab → 25 min, with reddit.com already open in another tab | That tab becomes the "Focus." page within a second; toolbar badge shows `25m` | |
+| 13.2 | Open netflix.com, youtube.com, tiktok.com | Each shows "Focus." with the time left; nothing appears in Sites → Recently paused; "Pauses today" does not move | |
+| 13.3 | Open music.youtube.com and any ordinary site | Both load | |
+| 13.4 | Tick "Keep YouTube open" before starting; open a video, then a Short | Video loads; clicking into Shorts closes it | |
+| 13.5 | "I need this site" → "Open it for 5 minutes" | Site opens; after 5 minutes it closes again; the fourth use on one site in a day is refused | |
+| 13.6 | Start, then press Cancel within a minute | Ends at once. After a minute the button reads "End early" and takes a 30 s breather | |
+| 13.7 | During focus, try to untick a category or remove a site | Disabled, with the note explaining why | |
+| 13.8 | Let a session run out with a "Focus." page open | Within 15 s it says focus is over and offers the site back | |
+| 13.9 | Schedule: tick today, set hours around now | Focus starts by itself within a minute; "End early" skips only today's window | |
+| 13.10 | Disable CleanTab (Guard), then start focus | Focus still closes sites | |
+| 13.11 | Use focus all day with no pass-through | The day is still "protected" | |
+
+---
+
 ## Results
 
 | Group | Pass | Fail | Notes |
@@ -289,6 +327,8 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 11a — Nano | / 11 | | |
 | 11 — Lock strength | / 12 | | |
 | 12 — Managed policy | / 9 | | |
+| 13 — Focus mode | / 11 | | |
+| 14 — Friction | / 10 | | |
 
 **129 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
@@ -305,7 +345,8 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
   page claimed "MIT licensed" with no licence file behind it until now.
 - ~~Permission justification~~ — drafted. The "Permissions, and why each one is needed"
   section of `/privacy` is written to be pasted into the submission form.
-- **Bump `manifest.json` version from `0.2`** — still open.
+- ~~Bump `manifest.json` version from `0.2`~~ — **done**, 1.0.0. `sh tools/package.sh` builds the upload zip.
+- **Landing site**: add focus mode to the feature copy and to `/privacy` (it stores focus settings and minutes locally; no new permission, no new request) before the listing links to it.
 - ~~Group 2 against the widened detection~~ — **passed 2026-09-17.** The hardening work
   and the /deploy page are no longer gated on it. Worth re-running the fuller 14-case set
   in MANUAL.md §C before any further loosening of the environment gate.

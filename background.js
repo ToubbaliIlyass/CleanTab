@@ -9,11 +9,16 @@ importScripts(
   "shared/keywords.js",
   "shared/scoring.js",
   "shared/pageshape.js",
+  "shared/detect.js",
   "shared/nano.js",
   "shared/allowance.js",
   "shared/review.js",
   "shared/schema.js",
   "shared/lock.js",
+  "shared/friction.js",
+  "shared/protection.js",
+  "shared/focus.js",
+  "shared/toolbar.js",
   "shared/migrations/v0_to_v1.js",
   "shared/migrations/v1_to_v2.js",
   "shared/storage.js",
@@ -23,19 +28,47 @@ importScripts(
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
+// Content scripts are only injected into pages that load AFTER the extension does, so on
+// install or update every tab that was already open would be unprotected until reloaded —
+// the first thing a new user tests. Inject into them. Needs the "scripting" permission;
+// host access is already granted by <all_urls>. Pages that refuse injection (browser
+// pages, the Web Store, PDFs) simply throw and are skipped.
+async function injectIntoOpenTabs() {
+  try {
+    const files = chrome.runtime.getManifest().content_scripts?.[0]?.js || [];
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const tab of tabs) {
+      try {
+        const [already] = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => Boolean(globalThis.__cleantabLoaded),
+        });
+        if (already?.result) continue;
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files });
+      } catch {
+        // Not injectable. Fine.
+      }
+    }
+  } catch {
+    // Never let this break install.
+  }
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "install" || details.reason === "update") injectIntoOpenTabs();
   bootstrap().then(() => {
     if (details.reason === "install") {
       chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/onboarding.html") });
     }
-    handleDailyRollover();
+    handleDailyRollover().then(() => refreshBadge());
     checkDisableTimer();
   });
 });
 
 chrome.runtime.onStartup.addListener(() => {
   bootstrap().then(() => {
-    handleDailyRollover();
+    // setIcon does not survive a browser restart, so repaint the badge arc here.
+    handleDailyRollover().then(() => refreshBadge());
     checkDisableTimer();
   });
 });
@@ -65,13 +98,29 @@ async function resumeOnboardingIfInterrupted() {
   }
 }
 
-chrome.alarms.create("dailyRollover", { periodInMinutes: 30 });
-chrome.alarms.create("minuteTick", { periodInMinutes: 1 });
-chrome.alarms.create("checkDisableTimer", { periodInMinutes: 1 });
+// This runs on every service worker start. chrome.alarms.create() with an existing name
+// replaces that alarm and restarts its period, so creating unconditionally let a worker
+// that kept waking up (every page load sends it a message) push the next tick back
+// indefinitely. Only create what is missing.
+async function ensureAlarm(name, periodInMinutes) {
+  try {
+    if (await chrome.alarms.get(name)) return;
+    chrome.alarms.create(name, { periodInMinutes });
+  } catch {
+    // Never let alarm setup break startup.
+  }
+}
+
+ensureAlarm("dailyRollover", 30);
+ensureAlarm("minuteTick", 1);
+ensureAlarm("checkDisableTimer", 1);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "dailyRollover") handleDailyRollover().then(recalibrateGoal);
-  if (alarm.name === "minuteTick") tickMinuteForActiveTab();
+  if (alarm.name === "dailyRollover") {
+    handleDailyRollover().then(recalibrateGoal).then(() => refreshBadge());
+  }
+  if (alarm.name === "minuteTick") { tickMinuteForActiveTab(); tickFocus(); }
+  if (alarm.name === "offscreenIdle") chrome.offscreen.closeDocument().catch(() => {});
   if (alarm.name === "checkDisableTimer") checkDisableTimer();
 });
 
@@ -124,7 +173,12 @@ async function publishHealth() {
 
 let offscreenCreating = null;
 
+// The classifier keeps a TensorFlow model and a GPU context alive. Close the document
+// after a quiet spell; the next image recreates it. One-shot alarm, pushed back on use.
+const OFFSCREEN_IDLE_MIN = 5;
+
 async function ensureOffscreenDoc() {
+  chrome.alarms.create("offscreenIdle", { delayInMinutes: OFFSCREEN_IDLE_MIN });
   const contexts = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] });
   if (contexts.length > 0) return;
   // Concurrent callers would otherwise race and throw "Only a single offscreen document
@@ -139,14 +193,19 @@ async function ensureOffscreenDoc() {
 }
 
 function askOffscreen(message, timeoutMs = 20000) {
+  // Only the image classifier feeds the "Text only" health badge. A slow or absent
+  // Gemini Nano answer says nothing about whether NSFW.js works.
+  const tracksHealth = message.action === "classifyBlob";
   return new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
-      health.modelState = "unavailable";
-      health.lastError = "Classifier timed out";
-      publishHealth();
+      if (tracksHealth) {
+        health.modelState = "unavailable";
+        health.lastError = "Classifier timed out";
+        publishHealth();
+      }
       resolve(null);
     }, timeoutMs);
 
@@ -155,14 +214,18 @@ function askOffscreen(message, timeoutMs = 20000) {
       settled = true;
       clearTimeout(timer);
       if (chrome.runtime.lastError || !response?.ok) {
-        health.modelState = "unavailable";
-        health.lastError = chrome.runtime.lastError?.message || response?.error || "unknown";
-        publishHealth();
+        if (tracksHealth) {
+          health.modelState = "unavailable";
+          health.lastError = chrome.runtime.lastError?.message || response?.error || "unknown";
+          publishHealth();
+        }
         resolve(null);
       } else {
-        health.modelState = "ready";
-        health.lastError = null;
-        publishHealth();
+        if (tracksHealth) {
+          health.modelState = "ready";
+          health.lastError = null;
+          publishHealth();
+        }
         resolve(response.result);
       }
     });
@@ -179,12 +242,28 @@ function bytesToDataUrl(bytes, mimeType) {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
-async function classifyImageUrl(src) {
+// Bounds what one image can cost: memory in the worker, and the size of the message
+// carrying it (base64 inflates by a third) to the offscreen document.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const IMAGE_FETCH_TIMEOUT_MS = 15000;
+
+function isHttpUrl(value) {
   try {
-    const res = await fetch(src);
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+async function classifyImageUrl(src) {
+  if (!isHttpUrl(src)) return null;
+  try {
+    const res = await fetch(src, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!res.ok) { health.fetchFailures += 1; publishHealth(); return null; }
+    if (Number(res.headers.get("content-length")) > MAX_IMAGE_BYTES) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length < 1024) return null; // tracking pixels, spacers
+    if (bytes.length < 1024 || bytes.length > MAX_IMAGE_BYTES) return null; // pixels, spacers, huge files
     const mimeType = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
     if (!mimeType.startsWith("image/") || mimeType.includes("svg")) return null;
 
@@ -210,9 +289,9 @@ async function classifyViaContentScript(tabId, src) {
   return await askOffscreen({ action: "classifyBlob", dataUrl });
 }
 
+// See predictionUnsafeScore() in shared/review.js: "sexy" counts at half weight.
 function unsafeScore(prediction) {
-  if (!prediction) return 0;
-  return (prediction.porn || 0) + (prediction.hentai || 0) + (prediction.sexy || 0);
+  return predictionUnsafeScore(prediction);
 }
 
 // ── Gemini Nano adjudication ──────────────────────────────────────────────────
@@ -256,6 +335,15 @@ async function adjudicate(page) {
   return verdict;
 }
 
+// The sensitivity profile that actually governs this install: an administrator's value
+// wins over the user's, exactly as it does in getTabPolicy. Image and appeal thresholds
+// used to read the user's own value and ignore policy.
+async function effectiveProfile() {
+  const stored = await storageGet(["sensitivity"]);
+  const managed = await managedGet();
+  return getProfile(effectiveSettings(stored, managed).sensitivity);
+}
+
 // ── Redirect ──────────────────────────────────────────────────────────────────
 //
 // The blocked URL is kept in session storage keyed by tab, not in the redirect page's
@@ -264,11 +352,13 @@ async function adjudicate(page) {
 
 const BLOCKED_KEY = "blockedByTab";
 
-async function stashBlocked(tabId, url, reason) {
-  const data = await sessionGet([BLOCKED_KEY]);
-  const map = data[BLOCKED_KEY] || {};
-  map[tabId] = { url, reason, ts: Date.now() };
-  await sessionSet({ [BLOCKED_KEY]: map });
+function stashBlocked(tabId, url, reason, kind = "nsfw") {
+  return serialized(async () => {
+    const data = await sessionGet([BLOCKED_KEY]);
+    const map = data[BLOCKED_KEY] || {};
+    map[tabId] = { url, reason, kind, ts: Date.now() };
+    await sessionSet({ [BLOCKED_KEY]: map });
+  });
 }
 
 async function readBlocked(tabId) {
@@ -279,27 +369,31 @@ async function readBlocked(tabId) {
 async function redirectTab(tabId, url, reason) {
   await stashBlocked(tabId, url, reason);
   await recordBlock(domainFromUrl(url), reason);
-  chrome.tabs.update(tabId, { url: chrome.runtime.getURL("redirect/redirect.html") });
+  // The tab can close between the verdict and here.
+  chrome.tabs.update(tabId, { url: chrome.runtime.getURL("redirect/redirect.html") })
+    .catch(() => {});
 }
 
-chrome.tabs.onRemoved.addListener(async (tabId) => {
+chrome.tabs.onRemoved.addListener((tabId) => serialized(async () => {
   const data = await sessionGet([BLOCKED_KEY, VERDICT_KEY]);
   const blocked = data[BLOCKED_KEY] || {};
   const verdicts = data[VERDICT_KEY] || {};
   delete blocked[tabId];
   delete verdicts[tabId];
   await sessionSet({ [BLOCKED_KEY]: blocked, [VERDICT_KEY]: verdicts });
-});
+}));
 
 // ── Per-tab scan verdicts (plan §9 Phase 14) ──────────────────────────────────
 
 const VERDICT_KEY = "tabVerdicts";
 
-async function setVerdict(tabId, verdict) {
-  const data = await sessionGet([VERDICT_KEY]);
-  const map = data[VERDICT_KEY] || {};
-  map[tabId] = { ...verdict, ts: Date.now() };
-  await sessionSet({ [VERDICT_KEY]: map });
+function setVerdict(tabId, verdict) {
+  return serialized(async () => {
+    const data = await sessionGet([VERDICT_KEY]);
+    const map = data[VERDICT_KEY] || {};
+    map[tabId] = { ...verdict, ts: Date.now() };
+    await sessionSet({ [VERDICT_KEY]: map });
+  });
 }
 
 async function getVerdict(tabId) {
@@ -307,17 +401,38 @@ async function getVerdict(tabId) {
   return (data[VERDICT_KEY] || {})[tabId] || null;
 }
 
+// A verdict describes one URL. When the tab moves on, it is dropped, so a clean verdict
+// from the last page can never be credited to a page that was not scanned (a browser
+// page, the PDF viewer). The content script reports again once it has scanned the new one.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo.url) return;
+  serialized(async () => {
+    const data = await sessionGet([VERDICT_KEY]);
+    const map = data[VERDICT_KEY] || {};
+    if (!(tabId in map)) return;
+    delete map[tabId];
+    await sessionSet({ [VERDICT_KEY]: map });
+  });
+});
+
 // ── Minute tracking ───────────────────────────────────────────────────────────
 
-const VERDICT_FRESH_MS = 2 * 60 * 1000;
+// "Away" means no input for this long. A minute was too short: reading an article or
+// watching a video without touching anything counted as being away, so the day's browsed
+// minutes barely moved and most days stayed "quiet" instead of becoming protected.
+const IDLE_AFTER_S = 5 * 60;
 
 async function tickMinuteForActiveTab() {
   const data = await storageGet(["enabled", "disableUntil"]);
   if (data.enabled === false) return;
   if (data.disableUntil && data.disableUntil > Date.now()) return;
 
-  const state = await new Promise((r) => chrome.idle.queryState(60, r));
+  const state = await new Promise((r) => chrome.idle.queryState(IDLE_AFTER_S, r));
   if (state !== "active") return;
+
+  // Working in another app with Chrome in the background is not browsing.
+  const win = await chrome.windows.getLastFocused().catch(() => null);
+  if (!win?.focused) return;
 
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab || !tab.url || !tab.id) return;
@@ -329,7 +444,12 @@ async function tickMinuteForActiveTab() {
   // No verdict means we could not scan this tab — chrome://, the PDF viewer, the web
   // store. That is neutral, not virtuous: it advances neither counter. Counting it was
   // what made the old "clean minutes" number meaningless.
-  if (!verdict || Date.now() - verdict.ts > VERDICT_FRESH_MS) return;
+  //
+  // There is no age limit on a verdict. It used to expire after two minutes, and a page is
+  // only scanned when it loads, so every page stopped counting two minutes in: an hour on
+  // one article was worth two browsed minutes. It is dropped when the tab's URL changes
+  // instead (see onUpdated above).
+  if (!verdict) return;
 
   const today = await tickMinute(verdict.clean);
   refreshBadge(today);
@@ -337,60 +457,157 @@ async function tickMinuteForActiveTab() {
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
-function drawBadgeArc(pct, dimmed) {
-  const SIZE = 48;
-  const canvas = new OffscreenCanvas(SIZE, SIZE);
-  const ctx = canvas.getContext("2d");
-  const c = SIZE / 2;
-  const r = 19;
-  const accent = dimmed ? "#B5AFA7" : "#FF6B35";
+// The toolbar icon is the mascot's face with the popup mascot's mood (shared/toolbar.js);
+// the tooltip carries the mood line and the protected-days count. The manifest's static
+// PNGs are the neutral calm face.
+//
+// setIcon does not survive a browser restart, so this repaints on every worker start, but
+// only when what is shown has changed, so the minute tick costs one storage read.
+let lastIconKey = "";
 
-  ctx.beginPath();
-  ctx.arc(c, c, r, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(0,0,0,0.07)";
-  ctx.lineWidth = 5;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(c, c, 4, 0, Math.PI * 2);
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = dimmed ? 0.5 : 0.4 + pct * 0.6;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  if (pct > 0.01) {
-    const start = -Math.PI / 2;
-    ctx.beginPath();
-    ctx.arc(c, c, r, start, start + pct * Math.PI * 2);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-    ctx.stroke();
-  }
-
-  chrome.action.setIcon({ imageData: ctx.getImageData(0, 0, SIZE, SIZE) }).catch(() => {});
-}
-
-// Repaints from stored state. The old version painted once per tick and left a stale arc
-// up through rollover and through a pause.
 async function refreshBadge(todayArg) {
-  const data = await storageGet(["today", "enabled", "disableUntil"]);
-  const today = todayArg || data.today || {};
-  const paused = data.enabled === false ||
-    (data.disableUntil && data.disableUntil > Date.now());
-  drawBadgeArc(cleanShare(today), paused);
+  const data = await storageGet(["today", "history", "totals", "enabled", "disableUntil"]);
+  if (todayArg) data.today = todayArg;
+  const { mood, protectedCount, days } = moodFromData(data, todayLocal());
+
+  const key = `${mood.level}:${protectedCount}`;
+  if (key === lastIconKey) return;
+  lastIconKey = key;
+
+  try {
+    await chrome.action.setIcon({ path: toolbarSpec(mood.level).path });
+    await chrome.action.setTitle({
+      title: `CleanTab: ${mood.caption} ${protectedCount} of the last ${days} days protected.`,
+    });
+  } catch {
+    lastIconKey = ""; // try again next time
+  }
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (changes.enabled || changes.disableUntil || changes.cleanShareGoal) refreshBadge();
+  if (changes.enabled || changes.disableUntil || changes.today || changes.history) refreshBadge();
+  if (changes.focus || changes.focusSession || changes.focusSkipUntil) refreshFocusBadge();
 });
 
+// ── Focus mode ────────────────────────────────────────────────────────────────
+//
+// shared/focus.js decides; this is the stored state, the five-minute passes and the
+// toolbar badge. The popup starts and ends sessions by writing storage directly, like
+// every other setting, and the content scripts hear about it through storage.onChanged.
+
+const FOCUS_KEYS = ["focus", "focusSession", "focusSkipUntil"];
+const FOCUS_PASS_KEY = "focusPasses"; // session: { domain: until }
+
+async function getFocusPass(domain) {
+  const data = await sessionGet([FOCUS_PASS_KEY]);
+  const until = (data[FOCUS_PASS_KEY] || {})[domain];
+  return until && until > Date.now() ? until : null;
+}
+
+function grantFocusPass(domain) {
+  return serialized(async () => {
+    const data = await sessionGet([FOCUS_PASS_KEY]);
+    const now = Date.now();
+    const passes = {};
+    for (const [d, until] of Object.entries(data[FOCUS_PASS_KEY] || {})) {
+      if (until > now) passes[d] = until;
+    }
+    passes[domain] = now + FOCUS_PASS_MS;
+    await sessionSet({ [FOCUS_PASS_KEY]: passes });
+  });
+}
+
+// What focus says about one URL: { blocked, reason, until, nextChange }. nextChange is
+// when the answer could differ, so a page that is already open knows when to ask again
+// (a schedule starting, a session or a pass ending) without polling the worker.
+async function focusPolicyFor(url, stored) {
+  const status = focusStatus(stored);
+  const policy = { blocked: false, active: status.active, until: status.until, nextChange: status.nextChange };
+  if (!status.active) return policy;
+
+  const match = focusMatch(url, stored.focus);
+  if (!match) return policy;
+
+  const passUntil = await getFocusPass(domainFromUrl(url));
+  if (passUntil) {
+    policy.nextChange = Math.min(passUntil, status.until);
+    return policy;
+  }
+  policy.blocked = true;
+  policy.reason = `${domainFromUrl(url)} is closed while you focus.`;
+  return policy;
+}
+
+// Minutes left, on the toolbar icon, so a session is visible without opening anything.
+async function refreshFocusBadge() {
+  try {
+    const status = focusStatus(await storageGet(FOCUS_KEYS));
+    if (!status.active) {
+      await chrome.action.setBadgeText({ text: "" });
+      return;
+    }
+    await chrome.action.setBadgeBackgroundColor({ color: "#FF6B35" });
+    await chrome.action.setBadgeTextColor?.({ color: "#FFFFFF" });
+    await chrome.action.setBadgeText({ text: focusBadgeText(status.until - Date.now()) });
+  } catch {
+    // The badge is decoration; never let it break a tick.
+  }
+}
+
+// Once a minute while focus is on. Focus time is wall-clock time with the screen
+// unlocked: working in another app is the whole point, so unlike browsed minutes this
+// does not ask whether Chrome is in front.
+async function tickFocus() {
+  const stored = await storageGet([...FOCUS_KEYS, "enabled", "disableUntil"]);
+  const status = focusStatus(stored);
+  if (status.active) {
+    // A scheduled window can open while protection is paused. Focus ends the pause.
+    if (stored.enabled === false || stored.disableUntil) {
+      await storageRemove("disableUntil");
+      await storageSet({ enabled: true });
+    }
+    const state = await new Promise((r) => chrome.idle.queryState(IDLE_AFTER_S, r));
+    if (state !== "locked") await recordDayEvent("focusMinutes");
+  }
+  refreshFocusBadge();
+}
+
 // ── Message router ────────────────────────────────────────────────────────────
+//
+// Every handler is reachable only from the context it was written for. Nothing outside the
+// extension can message the worker (no externally_connectable), but a content script runs
+// beside page code, so it must not be able to call the pause screen's or popup's actions.
+const EXTENSION_URL = chrome.runtime.getURL("");
+const REDIRECT_URL = chrome.runtime.getURL("redirect/redirect.html");
+
+const fromContentScript = (sender) =>
+  Boolean(sender.tab) && !String(sender.url || "").startsWith(EXTENSION_URL);
+const fromRedirectPage = (sender) => String(sender.url || "").startsWith(REDIRECT_URL);
+const fromExtensionPage = (sender) => String(sender.url || "").startsWith(EXTENSION_URL);
+
+const SENDER_RULES = {
+  getTabPolicy: fromContentScript,
+  tabVerdict: fromContentScript,
+  redirect: fromContentScript,
+  classifyImage: fromContentScript,
+  nanoAdjudicate: fromContentScript,
+  getBlockContext: fromRedirectPage,
+  leavePause: fromRedirectPage,
+  checkPage: fromRedirectPage,
+  allowOnce: fromRedirectPage,
+  appealRequest: fromRedirectPage,
+  nanoStatus: fromExtensionPage,
+  getHealth: fromExtensionPage,
+};
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = HANDLERS[msg?.action];
   if (!handler) return false;
+  if (sender.id !== chrome.runtime.id || !SENDER_RULES[msg.action]?.(sender)) {
+    sendResponse({ error: "Not permitted from this context." });
+    return false;
+  }
   Promise.resolve(handler(msg, sender)).then(sendResponse).catch((err) => {
     console.error(`CleanTab ${msg.action} failed:`, err);
     sendResponse({ error: String(err?.message || err) });
@@ -405,10 +622,16 @@ const HANDLERS = {
   async getTabPolicy(msg, sender) {
     const url = msg.url || sender.tab?.url || "";
     const domain = domainFromUrl(url);
-    const stored = await storageGet([
-      "enabled", "disableUntil", "trustedSites", "sensitivity", "enableDwellDetection",
+    // One round trip per page load wakes the worker, so the reads run together.
+    const [stored, managed, sitePausedUntil, allowed] = await Promise.all([
+      storageGet([
+        "enabled", "disableUntil", "trustedSites", "sensitivity", "enableDwellDetection",
+        "blockedSites", ...FOCUS_KEYS,
+      ]),
+      managedGet(),
+      getSitePause(domain),
+      hasAllowance(url),
     ]);
-    const managed = await managedGet();
     // An administrator's sensitivity and image-scanning values win over the user's.
     // Merging here rather than in the popup is what makes the policy actually govern
     // detection instead of only greying out a control.
@@ -416,6 +639,9 @@ const HANDLERS = {
 
     let globallyOff = data.enabled === false ||
       Boolean(data.disableUntil && data.disableUntil > Date.now());
+    // Focus is an extra layer: protection is always on underneath it. tickFocus() also
+    // writes that back to storage; this covers the minute before it does.
+    if (focusStatus(stored).active) globallyOff = false;
     // A policy that forbids disabling also invalidates a disable already in flight.
     if (managed.allowDisable === false) globallyOff = false;
 
@@ -428,10 +654,20 @@ const HANDLERS = {
     return {
       enabled: !globallyOff,
       trusted: isTrusted(trustedSites, domain),
-      sitePausedUntil: await getSitePause(domain),
-      allowed: await hasAllowance(url),
+      // Lists the content script can act on before the page has even loaded. The user's
+      // own blocklist beats the trust list; the built-in adult-site list does not.
+      userBlocked: isUserBlocked(data.blockedSites, domain),
+      // The adult-site list is not something a click can switch off: only an
+      // administrator's trust entry exempts a domain from it.
+      knownAdult: isKnownAdultDomain(domain) &&
+        !isTrusted((managed.lockedTrustedSites || []).map((d) => makeTrustEntry(d, "managed")), domain),
+      sitePausedUntil,
+      allowed,
       profile,
       dwellEnabled: Boolean(data.enableDwellDetection) && profile.dwell,
+      // Independent of everything above: focus applies with protection off, and to
+      // trusted sites.
+      focus: await focusPolicyFor(url, stored),
     };
   },
 
@@ -443,19 +679,32 @@ const HANDLERS = {
 
   async redirect(msg, sender) {
     if (!sender.tab?.id || !sender.tab.url) return { ok: false };
-    await redirectTab(sender.tab.id, sender.tab.url, msg.reason || "This page was flagged.");
+    if (msg.kind === "focus") {
+      // Decided again here rather than taken on the page's word, and kept out of the
+      // block log and the day's pause count: a focus block is not a slip.
+      const focus = await focusPolicyFor(sender.tab.url, await storageGet(FOCUS_KEYS));
+      if (!focus.blocked) return { ok: false };
+      await stashBlocked(sender.tab.id, sender.tab.url, focus.reason, "focus");
+      await recordDayEvent("focusBlocks");
+      chrome.tabs.update(sender.tab.id, { url: chrome.runtime.getURL("redirect/redirect.html") })
+        .catch(() => {});
+      return { ok: true };
+    }
+    const reason = String(msg.reason || "").slice(0, 200) || "This page was flagged.";
+    await redirectTab(sender.tab.id, sender.tab.url, reason);
     return { ok: true };
   },
 
   async classifyImage(msg, sender) {
-    const data = await storageGet(["sensitivity"]);
-    const profile = getProfile(data.sensitivity);
+    if (!isHttpUrl(msg.src)) return { unsafe: false, inconclusive: true };
+    const profile = await effectiveProfile();
     let prediction = await classifyImageUrl(msg.src);
     if (!prediction && sender.tab?.id) {
       prediction = await classifyViaContentScript(sender.tab.id, msg.src);
     }
     if (!prediction) return { unsafe: false, inconclusive: true };
-    return { unsafe: unsafeScore(prediction) > profile.unsafeProb };
+    const score = unsafeScore(prediction);
+    return { unsafe: score > profile.unsafeProb, score };
   },
 
   // What the redirect page needs. The URL never travelled through the query string.
@@ -463,17 +712,36 @@ const HANDLERS = {
     const tabId = sender.tab?.id;
     const blocked = tabId ? await readBlocked(tabId) : null;
     if (!blocked) return { reason: "This page was flagged.", domain: "", canAppeal: false };
+    if (blocked.kind === "focus") {
+      const domain = domainFromUrl(blocked.url);
+      const focus = await focusPolicyFor(blocked.url, await storageGet(FOCUS_KEYS));
+      const allowance = await allowanceStateFor(`focus:${domain}`);
+      return {
+        kind: "focus",
+        reason: blocked.reason,
+        domain,
+        canAppeal: false,
+        // False once the session has ended (or a pass was granted in another tab): the
+        // page then offers the way back instead of a countdown.
+        stillBlocked: focus.blocked,
+        until: focus.until,
+        allowanceRemaining: allowance.remaining,
+      };
+    }
     const managed = await managedGet();
-    const allowance = await allowanceStateFor(domainFromUrl(blocked.url));
+    const domain = domainFromUrl(blocked.url);
+    const stored = await storageGet(["blockedSites", "partnerLockHash", "lockWindow", "today"]);
+    const allowance = await allowanceStateFor(domain);
+    const listed = isUserBlocked(stored.blockedSites, domain) ? "own"
+      : knownAdultDomains.has(domain) ? "adult" : null;
     return {
       reason: blocked.reason,
-      domain: domainFromUrl(blocked.url),
+      domain,
+      // On a list: there is nothing to check and no way through from here.
+      listed,
+      listedNote: listed ? passPermission({ listed }).why : "",
       allowanceRemaining: allowance.remaining,
-      allowanceMessage: allowanceMessage(allowance.remaining),
-      // "Let me through once" is deliberately NOT gated here. A policy can withhold
-      // permanent trust; it should not make a false positive unreachable.
-      canAppeal: !knownAdultDomains.has(domainFromUrl(blocked.url)) &&
-        managed.allowAppeals !== false,
+      canAppeal: !listed && managed.allowAppeals !== false,
     };
   },
 
@@ -485,15 +753,96 @@ const HANDLERS = {
     if (!blocked) return { ok: false };
 
     const domain = domainFromUrl(blocked.url);
-    const state = await allowanceStateFor(domain);
-    if (state.exhausted) {
-      return { ok: false, exhausted: true, reason: allowanceMessage(0) };
+
+    // Focus: five minutes on this site, three times a day. Never a "pass" in the
+    // protected-days sense. If focus has ended meanwhile, this is simply the way back.
+    if (blocked.kind === "focus") {
+      const focus = await focusPolicyFor(blocked.url, await storageGet(FOCUS_KEYS));
+      if (focus.blocked) {
+        const key = `focus:${domain}`;
+        const left = await allowanceStateFor(key);
+        if (left.exhausted) {
+          return {
+            ok: false,
+            exhausted: true,
+            reason: "That's three times on this site today. It will be here when you're done.",
+          };
+        }
+        await recordAllowance(key);
+        await grantFocusPass(domain);
+      }
+      chrome.tabs.update(tabId, { url: blocked.url });
+      return { ok: true };
     }
 
+    // Opening a page that did NOT check out clean. Everything that makes this cost
+    // something is enforced here, not just drawn on the pause page: the page must have
+    // been checked, the wait must have run, and the lock applies.
+    const ready = await readPassReady(tabId);
+    if (!ready || ready.url !== blocked.url) return { ok: false, reason: "Check the page first." };
+    if (Date.now() < ready.at) return { ok: false, reason: "The wait isn't over yet." };
+
+    const permission = await passPermissionFor(domain);
+    if (!permission.available) return { ok: false, exhausted: true, reason: permission.why };
+    if (permission.needsPartner) {
+      const { partnerLockHash } = await storageGet(["partnerLockHash"]);
+      if (!(await partnerPassphraseMatches(msg.passphrase, partnerLockHash))) {
+        return { ok: false, partner: true, reason: "That isn't the passphrase." };
+      }
+    }
+
+    await clearPassReady(tabId);
     await recordAllowance(domain);
+    await recordDayEvent("passes");
     await grantAllowance(blocked.url);
     chrome.tabs.update(tabId, { url: blocked.url });
-    return { ok: true, remaining: state.remaining - 1 };
+    return { ok: true };
+  },
+
+  // "Check this page": the answer to a wrong block. The page's text and pictures are
+  // re-read on the device. Clean opens it, free, and the day stays protected. Anything
+  // else leaves it closed and says what opening it anyway would take.
+  async checkPage(msg, sender) {
+    const tabId = sender.tab?.id;
+    const blocked = tabId ? await readBlocked(tabId) : null;
+    if (!blocked || blocked.kind === "focus") return { status: "lost", reason: "The original page was lost." };
+
+    const domain = domainFromUrl(blocked.url);
+    const permission = await passPermissionFor(domain);
+    if (permission.listed) return { status: "listed", reason: permission.why };
+
+    const result = await reviewPageFull(blocked.url);
+    if (result.verdict === "clean") {
+      await grantAllowance(blocked.url);
+      chrome.tabs.update(tabId, { url: blocked.url });
+      return { status: "clean", reason: result.reason };
+    }
+
+    const { today } = await storageGet(["today"]);
+    const waitSeconds = passWaitSeconds((today || {}).passes);
+    if (permission.available) await setPassReady(tabId, blocked.url, Date.now() + waitSeconds * 1000);
+    return {
+      status: result.verdict, // "flagged" | "unclear"
+      reason: result.reason,
+      anyway: {
+        available: permission.available,
+        why: permission.why,
+        needsPartner: Boolean(permission.needsPartner),
+        waitSeconds,
+      },
+    };
+  },
+
+  // "Leave" on the pause screen: counted (it is the outcome worth celebrating) and the
+  // tab goes to a new tab page. Nothing is stored about where it was.
+  async leavePause(msg, sender) {
+    const tabId = sender.tab?.id;
+    if (!tabId) return { ok: false };
+    // "leaves" is the count of adult-content pauses you walked away from.
+    const blocked = await readBlocked(tabId);
+    if (blocked?.kind !== "focus") await recordDayEvent("leaves");
+    chrome.tabs.update(tabId, { url: "chrome://newtab/" }).catch(() => {});
+    return { ok: true };
   },
 
   async appealRequest(msg, sender) {
@@ -502,6 +851,14 @@ const HANDLERS = {
     if (!blocked) return { status: "denied", reason: "Nothing to review — the original page was lost." };
 
     const domain = domainFromUrl(blocked.url);
+    const { blockedSites } = await storageGet(["blockedSites"]);
+    if (isUserBlocked(blockedSites, domain)) {
+      return {
+        status: "denied",
+        permanent: true,
+        reason: "You blocked this site yourself. Remove it from the Sites tab if that has changed.",
+      };
+    }
     if (knownAdultDomains.has(domain)) {
       return { status: "denied", permanent: true, reason: "This domain is on the adult content blocklist." };
     }
@@ -515,31 +872,14 @@ const HANDLERS = {
       };
     }
 
-    const profile = await getSensitivityProfile();
-    const result = await reviewPage(blocked.url, profile);
+    const result = await reviewPageFull(blocked.url);
 
-    if (result.verdict === "safe") {
+    if (result.verdict === "clean") {
       await addTrustedSite(domain, "appeal");
       chrome.tabs.update(tabId, { url: blocked.url });
-      return {
-        status: "approved",
-        reason: `Checked ${result.checked} image${result.checked === 1 ? "" : "s"} on the page — nothing flagged.`,
-      };
+      return { status: "approved", reason: result.reason };
     }
-
-    if (result.verdict === "unsafe") {
-      return {
-        status: "denied",
-        reason: `Image analysis flagged ${Math.round(result.worst * 100)}% likely adult content.`,
-      };
-    }
-
-    return {
-      status: "inconclusive",
-      reason: result.checked === 0
-        ? "Couldn't analyze this page's images — it may load them after opening."
-        : `Only ${result.checked} image${result.checked === 1 ? "" : "s"} could be checked. Not enough to clear it.`,
-    };
+    return { status: result.verdict === "flagged" ? "denied" : "inconclusive", reason: result.reason };
   },
 
   // The content script asks for a second opinion, and only when the rules were unsure.
@@ -568,44 +908,84 @@ const HANDLERS = {
     return data.detectionHealth || { modelState: health.modelState };
   },
 
-  async pauseSiteRequest(msg) {
-    await pauseSite(msg.domain, msg.ms);
-    return { ok: true };
-  },
-
-  async resumeSiteRequest(msg) {
-    await clearSitePause(msg.domain);
-    return { ok: true };
-  },
 };
 
-// ── Page review (replaces the screenshot appeal) ───────────────────────────────
+// ── Page review ───────────────────────────────────────────────────────────────
 //
-// The plan called for navigating the tab back and screenshotting it. That renders
-// possibly-explicit content to the user in order to decide whether they should be allowed
-// to see it — self-defeating. We fetch the page server-side and classify its images
-// instead; the user never sees it unless it clears. Parsing and verdict logic live in
-// shared/review.js so they are testable without a browser.
+// The page is fetched and judged without being shown: rendering possibly-explicit content
+// to decide whether someone may see it would defeat the point.
 
-async function reviewPage(pageUrl, profile) {
+// The whole-page check behind "Check this page" and "This site is fine": the fetched
+// page's words through the blocking rules at the strictest profile, and its pictures
+// through the classifier. See fullReviewVerdict() in shared/review.js.
+async function reviewPageFull(pageUrl) {
+  const profile = await effectiveProfile();
+  let html = "";
   try {
-    const res = await fetch(pageUrl, { credentials: "omit" });
-    if (!res.ok) return { verdict: "inconclusive", checked: 0, worst: 0 };
-
-    const images = parseImageUrls(await res.text(), pageUrl);
-    const predictions = [];
-    for (const src of images) {
-      predictions.push(await classifyImageUrl(src));
-      // Short-circuit: one clearly unsafe image settles it, no need to fetch the rest.
-      const running = reviewVerdict(predictions, profile);
-      if (running.verdict === "unsafe") return running;
-    }
-    return reviewVerdict(predictions, profile);
-  } catch (e) {
-    console.error("reviewPage error:", e);
-    return { verdict: "inconclusive", checked: 0, worst: 0 };
+    const res = await fetch(pageUrl, { credentials: "omit", signal: AbortSignal.timeout(15000) });
+    if (res.ok) html = await res.text();
+  } catch {
+    // Unreadable is "unclear", never "clean".
   }
+  if (!html) return fullReviewVerdict(null, 0, { verdict: "inconclusive", checked: 0, worst: 0 });
+
+  const page = pageFromHtml(html, pageUrl);
+  const textDecision = decidePage(page, getProfile("strict"));
+  // No point classifying pictures on a page the words already settled.
+  if (textDecision.block) return fullReviewVerdict(textDecision, page.bodyText.length, { verdict: "inconclusive", checked: 0 });
+
+  const predictions = [];
+  let images = { verdict: "inconclusive", checked: 0, worst: 0 };
+  for (const src of parseImageUrls(html, pageUrl)) {
+    predictions.push(await classifyImageUrl(src));
+    images = reviewVerdict(predictions, profile);
+    if (images.verdict === "unsafe") break;
+  }
+  return fullReviewVerdict(textDecision, page.bodyText.length, images);
+}
+
+// When an unverified page may be opened anyway: set by checkPage, read by allowOnce.
+const PASS_READY_KEY = "passReady"; // session: { tabId: { url, at } }
+
+function setPassReady(tabId, url, at) {
+  return serialized(async () => {
+    const data = await sessionGet([PASS_READY_KEY]);
+    const map = data[PASS_READY_KEY] || {};
+    // Checking again must not shorten a wait that is already running.
+    const existing = map[tabId];
+    map[tabId] = existing && existing.url === url ? existing : { url, at };
+    await sessionSet({ [PASS_READY_KEY]: map });
+  });
+}
+
+async function readPassReady(tabId) {
+  const data = await sessionGet([PASS_READY_KEY]);
+  return (data[PASS_READY_KEY] || {})[tabId] || null;
+}
+
+function clearPassReady(tabId) {
+  return serialized(async () => {
+    const data = await sessionGet([PASS_READY_KEY]);
+    const map = data[PASS_READY_KEY] || {};
+    delete map[tabId];
+    await sessionSet({ [PASS_READY_KEY]: map });
+  });
+}
+
+async function passPermissionFor(domain) {
+  const stored = await storageGet(["blockedSites", "partnerLockHash", "lockWindow"]);
+  const listed = isUserBlocked(stored.blockedSites, domain) ? "own"
+    : knownAdultDomains.has(domain) ? "adult" : null;
+  const allowance = await allowanceStateFor(domain);
+  return {
+    listed,
+    ...passPermission({ listed, settings: stored, managed: await managedGet(), exhausted: allowance.exhausted }),
+  };
 }
 
 // Runs on every service worker start, including the one caused by an extension reload.
 resumeOnboardingIfInterrupted();
+
+// Repaint the toolbar icon on every worker start (setIcon does not persist a restart).
+refreshBadge();
+refreshFocusBadge();

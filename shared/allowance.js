@@ -1,4 +1,6 @@
-// "Let me through once" — how many times, and how often.
+// Opening a page that did not check out clean — how many times, and how often.
+// (The wait, the lock and the page check that come first are in shared/friction.js and
+// the worker's checkPage/allowOnce handlers. What follows is the per-site daily cap.)
 //
 // The rule this product is built on: friction on turning CleanTab OFF is as high as it
 // can be, friction on getting past ONE false positive stays near zero. Detection

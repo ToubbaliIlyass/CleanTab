@@ -24,7 +24,7 @@ phrasing read as "we don't really block," which was never the intent. The lock i
 **Core narrative**
 > Most blockers borrow patterns from gambling apps: streaks, daily quotas, "don't break the chain." They work on a few people and quietly fail the rest, because the moment you slip, the whole structure collapses — and you uninstall.
 >
-> CleanTab is built on a different premise. The hard part isn't access. The hard part is noticing what's underneath the urge, and giving yourself a second to choose. Everything we built — the dwell-aware detection, the reflection chips, the one-hour cooldown, the ring that resets each day — is shaped by that idea.
+> CleanTab is built on a different premise. The hard part isn't access. The hard part is noticing what's underneath the urge, and giving yourself a second to choose. Everything we built — the dwell-aware detection, the reflection chips, the one-hour cooldown, the 14-day protected-days ring — is shaped by that idea.
 >
 > No streaks. No shame. No cloud. Just a tool that pauses with you.
 
@@ -62,7 +62,7 @@ The browsing intervention built on the idea that lasting change comes from notic
 Word-aware keyword matching, URL parameter intelligence, and on-device image classification that fires only when you *linger* — not every time something scrolls past. Built to catch the moments that matter, ignore the ones that don't.
 
 ### A ring, not a streak
-Streaks turn focus into a debt you can't pay back. CleanTab tracks clean browsing minutes against a daily ring that resets every morning. Closed yesterday and not today? You haven't lost anything.
+Streaks turn focus into a debt you can't pay back. CleanTab counts how many of the last 14 days were *protected* (protection stayed on, you didn't pass through a block). A slip lowers the number by one and it recovers as the days pass. Nothing ever resets to zero.
 
 ### Local. Forever.
 No accounts. No syncing. No telemetry. Your data is stored in your browser, exported as JSON if you want a backup, and never leaves your laptop. Period.
@@ -71,10 +71,10 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
 
 ## How it works
 
-1. **You install. We ask one question.** How many hours a day are you on your laptop? That sets your daily ring goal. You can change it later.
+1. **You install. A few quick choices.** Who it's for, how sensitive it should be (Balanced is pre-selected), optional locks. You can try a practice pause before you finish.
 2. **You browse. We watch quietly.** Word-boundary keyword scoring + URL analysis on every page. Image classification on visual platforms when you pause on something.
 3. **If something fires, you pause.** A simple page asks: *what's actually going on?* Bored? Stressed? Tired? Lonely? Pick one — or don't.
-4. **A tiny reminder.** Tied to the chip you picked, pulled from your own data: "Your ring is at 65% — 22 minutes to close today." One thing. Not a lecture.
+4. **A tiny reminder.** Tied to the chip you picked, pulled from your own data: "You've protected 11 of the last 14 days. This pause is part of that." One thing. Not a lecture.
 5. **You decide what's next.** Take a beat. Appeal if it was wrongly flagged. Or close the tab and go do something else.
 
 ---
@@ -94,21 +94,21 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
 ### Reflection
 - **6-chip reflection prompt** on every redirect: Bored / Stressed / Habit / Avoiding / Lonely / Tired. One tap, no typing.
 - **Contextual nudge** appears after the chip is tapped — one data-grounded line tied to what you just admitted to feeling:
-  - Bored → "Your ring is at 65% — 22 min to close today."
+  - Bored → "You've protected 11 of the last 14 days. This pause is part of that."
   - Stressed → "Take a moment to breathe" + promoted breathing button
   - Habit → "This is your 3rd pause today."
-  - Avoiding → "You've closed your ring on 12 days. Today's still open."
+  - Avoiding → "Whatever it is, it's usually smaller once you look at it. One small step on it?"
   - Lonely → "Loneliness often fuels the scroll. A quick message to someone real lands deeper."
   - Tired → time-of-day branch ("It's getting late" after 9 pm; otherwise "Your body's giving a signal")
 - **Built-in breathing exercise** — 3 cycles of 4-second inhale / hold / exhale, full-screen overlay.
 - **Appeal flow** — if you believe a page was wrongly flagged, CleanTab fetches the page and up to 8 of its own images (credentials omitted) and classifies them locally. **No screenshot is ever taken** — `captureVisibleTab` appears nowhere in the codebase. Fewer than 3 classifiable images returns *inconclusive* and holds the block, rather than handing out a permanent bypass by accident.
 
-### Anti-streak gamification (ring model)
-- **Daily ring goal** — closes when you accumulate enough clean browsing minutes today. Based on the Zeigarnik effect (the brain hates unfinished circles) and Apple Watch's motivational pattern.
+### Forgiving progress (protected-days model)
+- **Protected days** — a day is protected when protection stayed on, you browsed about 10 minutes, and you didn't use "Let me through once" or pause protection. Days with little browsing are "quiet" and never count against you. The ring and the plant show *N of the last 14 days protected*.
 - **Adaptive goal** — calibrated from a single onboarding question (how many hours/day on your laptop) and recalibrated over time.
-- **No streaks** — the ring resets fresh every day. Missing a day costs nothing.
-- **Cumulative-only metrics** — total closed days, total reflections logged. Numbers only ever go up, removing the "I broke my streak so why bother" failure mode.
-- **16-week heatmap** — visualizes when your rings closed, like GitHub contributions.
+- **No streak counter** — a slip lowers the 14-day count by one and it recovers as days pass. After a slip, a calm one-line message, never a count of failures. A personal best run is shown only as a record.
+- **Cumulative-only metrics** — total protected days, total reflections logged, milestones at 7, 30 and 100 protected days. Numbers only ever go up.
+- **16-week heatmap** — one square per day: protected (green), passed through (yellow), paused (pink), quiet (sand). Each square has a text equivalent.
 - **Pattern insights** — after 10 reflections, the popup surfaces which triggers (Bored, Tired, etc.) come up most often.
 
 ### Disable friction — "lock strength"
@@ -124,8 +124,8 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
 > **The rule that governs this whole section:** friction on *turning CleanTab off* is as high as possible; friction on *getting past one false positive* stays near zero. "Let me through once" is never gated — not by a partner lock, not by a lock window, not by policy. A misfire that becomes unreachable content is what makes people distrust the tool and remove it wholesale.
 
 ### Privacy
-- **100% local** — all data lives in `chrome.storage.local`. Nothing is ever transmitted.
-- **No telemetry, no analytics, no third-party scripts** — the extension makes zero network requests after install.
+- **100% local** — all data lives in `chrome.storage.local`. Nothing about you is ever transmitted to CleanTab or anyone else.
+- **No telemetry, no analytics, no third-party scripts** — the extension never contacts a CleanTab server. Its only requests go to the sites you are already browsing, to fetch an image you lingered on (image scanning, off by default) or the page you ask it to review.
 - **Export / import** — full data backup as a JSON file. Restore on a new device by import.
 - **On-device AI** — NSFW.js model weights are bundled with the extension; no API calls, no cloud inference.
 - **Open code** — the entire detection logic, scoring, and passphrase pool is visible in the source.
@@ -134,7 +134,7 @@ No accounts. No syncing. No telemetry. Your data is stored in your browser, expo
 - **Popup** — three tabs (Today, Progress, Guard) within a 380×560 frame, no scrolling.
 - **Onboarding** — one-question calibration on install, with live goal preview.
 - **Redirect page** — pause headline, reflection chips, contextual nudge, breathing button, appeal option.
-- **Toolbar badge** — small arc shows today's ring progress at a glance via OffscreenCanvas.
+- **Toolbar badge** — small arc shows your protected days out of the last 14 at a glance via OffscreenCanvas.
 
 ### Technical
 - Manifest V3 (service worker + offscreen document)
@@ -167,7 +167,7 @@ Yes. The redirect page tells you what triggered it. Source code is open.
 On YouTube it ignores normal videos (only flags adult-keyword pages). On Twitter, Pinterest, Reddit, Instagram, and Tumblr, dwell-based image detection is active.
 
 **Why no streaks?**
-Streaks turn intrinsic motivation ("I want to focus") into extrinsic ("I have to protect my number"). The moment you slip, the structure collapses and most people uninstall. The ring is designed to be forgiving of bad days without losing the long-term picture.
+Streaks turn intrinsic motivation ("I want to focus") into extrinsic ("I have to protect my number"). The moment you slip, the structure collapses and most people uninstall. The 14-day count is designed to be forgiving of bad days without losing the long-term picture.
 
 **What if I want sync across devices?**
 Not built. Use export/import to manually move your data. If user demand is high enough, sync could be added later — but it would always be optional, and the local-first storage stays the default.

@@ -33,6 +33,15 @@ function getDefaultToday(dateStr) {
     redirects: 0,
     reflections: 0,
     ringClosedAt: null,
+    // What decides whether today counts as protected (shared/protection.js).
+    passes: 0,   // "Let me through once" uses
+    pauses: 0,   // 10-minute quick pauses
+    offs: 0,     // full disables
+    leaves: 0,   // pause screens you left instead of passing through
+    // Focus mode (shared/focus.js). Never part of dayState: a focus block is not a slip.
+    focusMinutes: 0,
+    focusBlocks: 0,
+    celebrated: false,
   };
 }
 
@@ -45,7 +54,10 @@ function getDefaults(dateStr) {
     disableUntil: null,
     cooldownUntil: null,
     sensitivity: DEFAULT_SENSITIVITY,
-    enableDwellDetection: false, // plan §8.8 asked for this flag; it shipped on instead
+    // Pictures you linger on are checked by default. It is the only thing that catches a
+    // page that is explicit in pictures alone, and shared/dwell.js keeps it from firing
+    // on one picture. Existing installs keep whatever they had chosen.
+    enableDwellDetection: true,
     // Gemini Nano second opinion. Off by default: it needs a multi-gigabyte model that
     // Chrome downloads on first use, and most machines do not meet its requirements.
     enableNanoAssist: false,
@@ -76,6 +88,19 @@ function getDefaults(dateStr) {
     // on browsed minutes stops one clean minute reading as a closed day.
     cleanShareGoal: 0.95,
     goalMinutes: 120, // retained: the onboarding estimate, and context under the ring
+
+    // Sites the user blocked themselves ({ domain, addedAt }); subdomains included.
+    blockedSites: [],
+    // Quick-pause timestamps (rate limit), and if-then plans keyed by reflection chip.
+    pauseEvents: [],
+    ifThenPlans: {},
+    // For the welcome-back card; set whenever the popup opens.
+    lastPopupOpen: null,
+
+    // Focus mode (shared/focus.js): what to block while focusing, and when.
+    focus: null,          // settings; null means the defaults in focusSettings()
+    focusSession: null,   // { startedAt, until } while a timed session is running
+    focusSkipUntil: null, // "end early" during a scheduled window
 
     // Trust list — records as of v2, migrated from v1's bare `safeDomains` strings
     trustedSites: [],

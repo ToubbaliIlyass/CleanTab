@@ -2,7 +2,8 @@
 <html>
 <head><meta charset="UTF-8"></head>
 <body>
-<!-- nsfwjs.min.js is self-contained: bundles TF.js + MobileNetV2 model weights. -->
+<!-- nsfwjs.min.js bundles TF.js but NOT the model weights; offscreen.js loads those
+     from vendor/nsfwjs/model/. -->
 <script src="../vendor/nsfwjs/nsfwjs.min.js"></script>
 <!-- Gemini Nano lives here too rather than in the service worker: a session is
      expensive to create and the worker is terminated after ~30s idle. -->

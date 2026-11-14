@@ -15,6 +15,11 @@ The MobileNetV2-based model weights under `vendor/nsfwjs/model/` are distributed
 NSFW.js under the same MIT license. They are vendored rather than loaded from
 CloudFront so the extension makes no network request to classify an image.
 
+The NSFW.js bundle was downloaded from the jsDelivr CDN without a pinned version; record
+the exact version here when it is next refreshed (`vendor/SETUP.md`). The bundle also
+inlines a handful of small MIT/Apache-2.0 helper libraries; their licence headers are
+preserved inside `nsfwjs.min.js`.
+
 ## TensorFlow.js
 
 - **License:** Apache License 2.0
