@@ -175,12 +175,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function refreshStrip() {
-    const data = await storageGet(["history", "today", "reportSeenAt"]);
-    const due = reportDue(reportFirstDay(data.history, data.today), todayLocal(), data.reportSeenAt);
+    const data = await storageGet(["history", "today", "reportSeenAt", "supportSeenAt"]);
+    const first = reportFirstDay(data.history, data.today);
+    const due = reportDue(first, todayLocal(), data.reportSeenAt);
     $("reportStrip").style.display = due ? "" : "none";
+    // One thing at a time: the report first, the coffee only once it has been read.
+    $("supportStrip").style.display =
+      !due && supportDue(first, todayLocal(), data.supportSeenAt) ? "" : "none";
     $("reportStripText").textContent = data.reportSeenAt ? "Your week is ready" : "Your first week is ready";
   }
 
+  $("reportSupport").href = SUPPORT_URL;
+  $("supportOpen").addEventListener("click", async () => {
+    await storageSet({ supportSeenAt: Date.now() });
+    chrome.tabs.create({ url: SUPPORT_URL });
+  });
+  $("supportLater").addEventListener("click", async () => {
+    await storageSet({ supportSeenAt: Date.now() });
+    refreshStrip();
+  });
   $("reportStrip").addEventListener("click", open);
   $("reportOpen").addEventListener("click", open);
   $("reportDone").addEventListener("click", async () => {
@@ -200,7 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && (changes.history || changes.reportSeenAt)) refreshStrip();
+    if (area === "local" && (changes.history || changes.reportSeenAt || changes.supportSeenAt)) refreshStrip();
   });
 
   refreshStrip();

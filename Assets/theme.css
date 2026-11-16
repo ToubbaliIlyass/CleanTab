@@ -399,6 +399,17 @@ body { background: var(--wall); }
 .report-strip-star { font-size: 12px; line-height: 1; color: var(--coral); }
 /* The report strip takes the idle focus strip's place for the week it is due. */
 #panel-now:has(#reportStrip:not([style*="none"])) .focus-strip:not(.on) { display: none; }
+/* The coffee line: same slot, same rule, and quieter than the report. */
+.support-strip { flex-shrink: 0; display: flex; align-items: stretch; width: 100%; border: 2.5px solid var(--ink); border-radius: 12px;
+  background: var(--sky); box-shadow: 2px 2px 0 var(--ink); overflow: hidden; }
+.support-strip-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 5px 7px 5px 10px; border: 0; background: transparent;
+  cursor: pointer; font-family: var(--ff-b); color: var(--ink); text-align: left; }
+.support-strip-heart { font-size: 12px; line-height: 1; color: var(--coral); }
+.support-strip-x { flex: 0 0 34px; border: 0; border-left: 2.5px solid var(--ink); background: var(--paper); color: var(--ink); cursor: pointer;
+  font-size: 15px; line-height: 1; font-family: var(--ff-b); }
+.support-strip-main:active, .support-strip-x:active { background: var(--butter); }
+#panel-now:has(#supportStrip:not([style*="none"])) .focus-strip:not(.on) { display: none; }
+.report-foot a { color: var(--ink); font-weight: 700; }
 .recap-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .view-report { background: var(--paper); }
@@ -457,3 +468,93 @@ body { background: var(--wall); }
 .report-patterns li::before { content: ""; position: absolute; left: 0; top: .42em; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--ink); background: var(--butter); }
 .report-foot { font-size: 11px; line-height: 1.45; color: var(--text2); text-align: center; padding-bottom: 6px; }
 #reportFeelings { margin-top: 8px; }
+
+/* ── Popup polish ───────────────────────────────────────────────────────
+   Scoped to .popup so the onboarding and pause pages keep their own look. */
+
+/* One outline everywhere. These three kept a tinted border from popup.css under an ink
+   shadow, which read as a different component. */
+.popup .badge, .popup .guard-btn, .popup .guard-btn.danger, .popup .guard-btn.success,
+.popup .sens-btn, .popup .sens-btn.selected { border: 2.5px solid var(--ink); }
+.popup .guard-btn.danger { background: var(--blush); color: #7a1d12; }
+.popup .guard-btn.danger:hover { background: var(--blush); filter: brightness(.96); }
+.popup .guard-btn.success { background: var(--sage); color: var(--ink); }
+.popup .guard-btn { justify-content: center; background: var(--paper); }
+.popup .guard-btn:hover { background: var(--butter); }
+.popup .guard-btn.small.ghost { border: 2.5px solid var(--ink); }
+
+/* The chosen sensitivity is marked with a tick as well as the fill, not by colour alone. */
+.popup .sens-btn { position: relative; padding-right: 40px; background: var(--paper); }
+.popup .sens-btn.selected { background: var(--butter); }
+.popup .sens-btn.selected::after {
+  content: ""; position: absolute; right: 12px; top: 50%; width: 20px; height: 20px; margin-top: -10px;
+  border: 2.5px solid var(--ink); border-radius: 50%;
+  background: var(--coral) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 8.4l2.6 2.6L12 5.4'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+
+/* Checkboxes drawn in the same hand as everything else, and big enough to hit. */
+.popup input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 20px; height: 20px; margin: 0;
+  border: 2.5px solid var(--ink); border-radius: 7px; background: #fff center / 12px no-repeat; cursor: pointer;
+  transition: background-color .12s ease-out, transform .08s ease-out;
+}
+.popup input[type="checkbox"]:checked {
+  background-color: var(--coral);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.6 8.4l2.8 2.8L12.4 5'/%3E%3C/svg%3E");
+}
+.popup input[type="checkbox"]:active:not(:disabled) { transform: scale(.9); }
+.popup input[type="checkbox"]:disabled { opacity: .4; cursor: not-allowed; }
+.popup .toggle-row { gap: 10px; margin-top: 10px; }
+.popup .toggle-row input { margin-top: 0; }
+.popup .toggle-row.sub { margin-left: 30px; }
+/* A setting that stands alone on its row is a switch. */
+.popup input.lock-check {
+  width: 40px; height: 24px; border-radius: 99px; background: var(--s2); background-image: none; position: relative;
+}
+.popup input.lock-check::after {
+  content: ""; position: absolute; left: 2px; top: 2px; width: 15px; height: 15px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--ink); box-sizing: border-box; transition: transform .16s cubic-bezier(.3, 1.4, .5, 1);
+}
+.popup input.lock-check:checked { background-color: var(--sage); background-image: none; }
+.popup input.lock-check:checked::after { transform: translateX(16px); }
+.popup input.lock-check:active:not(:disabled) { transform: none; }
+
+/* Dividers: quiet dashes instead of a row of hard black lines. */
+.popup .panel-rule { height: 0; margin: 2px 0; background: none; border-top: 2.5px dashed rgba(43, 29, 20, .18); }
+
+/* Type: nothing under 10px, no faked italics, no single-word last lines. */
+.popup .stat-l, .popup .focus-strip-go, .popup .focus-dur span { font-size: 10px; }
+.popup .section-label { font-size: 10.5px; }
+.popup .empty-note { font-style: normal; color: var(--text2); line-height: 1.45; }
+.popup .guard-desc, .popup .site-meta, .popup .toggle-sub, .popup .lock-sub, .popup .lock-hint,
+.popup .sens-sub, .popup .empty-note, .popup .mascot-say, .popup .ring-context { text-wrap: pretty; }
+.popup .plant-card .guard-desc { text-wrap: balance; }
+
+/* The "Open / Start / Fix" words on the strips look like the buttons they are. */
+.popup .focus-strip-go { flex: 0 0 auto; padding: 1px 8px; line-height: 1.4; border: 2px solid var(--ink); border-radius: 99px; background: var(--paper); color: var(--ink); }
+.popup .focus-strip, .popup .report-strip, .popup .gap-row { padding: 5px 7px 5px 10px; }
+.popup .gap-row { transition: transform .12s ease-out, box-shadow .12s ease-out; }
+.popup .gap-row:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+
+/* Now: each half of the hero carries its own caption, so the two lines no longer collide. */
+.popup .ring-col { flex: 0 0 auto; width: 150px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.popup .ring-context { margin-top: 0; min-height: 1.3em; line-height: 1.3; text-wrap: balance; }
+.popup #panel-now { gap: 6px; padding-top: 12px; padding-bottom: 8px; }
+
+/* Scrolling tabs fade out at the bottom edge, so it is clear there is more below. */
+.popup #panel-focus, .popup #panel-progress, .popup #panel-sites, .popup #panel-guard {
+  padding-top: 16px; padding-bottom: 30px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+.popup #panel-progress .panel-section, .popup #panel-progress .plant-card { flex-shrink: 0; }
+.popup .recap-head { min-height: 0; }
+.popup .mascot-recap { width: 44px; margin: -10px 0 -6px; }
+
+/* Tabs: the press is felt on the way down, and a new panel settles in rather than snapping. */
+.popup .tab { transition: color .15s, background-color .15s, transform .08s ease-out; }
+.popup .tab:active { transform: scale(.96); }
+@media (prefers-reduced-motion: no-preference) {
+  .popup .panel:not(.hidden) { animation: panel-in .18s ease-out; }
+}
+@keyframes panel-in { from { opacity: 0; transform: translateY(4px); } }

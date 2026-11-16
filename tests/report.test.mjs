@@ -122,6 +122,12 @@ export default async function () {
     notOk(run(`reportDue("${key(6)}", "${key(0)}", null, ${now})`));
     ok(run(`reportDue("${key(7)}", "${key(0)}", null, ${now})`));
     notOk(run(`reportDue(null, "${key(0)}", null, ${now})`));
+    // The coffee line: after a week, then put away for three months by any answer.
+    notOk(run(`supportDue("${key(6)}", "${key(0)}", null, ${now})`));
+    ok(run(`supportDue("${key(7)}", "${key(0)}", null, ${now})`));
+    notOk(run(`supportDue("${key(40)}", "${key(0)}", ${now - 89 * 86400000}, ${now})`));
+    ok(run(`supportDue("${key(140)}", "${key(0)}", ${now - 90 * 86400000}, ${now})`));
+    notOk(run(`supportDue(null, "${key(0)}", null, ${now})`));
   });
   t("then once a week after it was last dismissed", () => {
     notOk(run(`reportDue("${key(40)}", "${key(0)}", ${now - 6 * 86400000}, ${now})`));

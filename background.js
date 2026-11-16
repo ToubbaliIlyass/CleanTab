@@ -18,6 +18,7 @@ importScripts(
   "shared/friction.js",
   "shared/protection.js",
   "shared/focus.js",
+  "shared/focuspage.js",
   "shared/toolbar.js",
   "shared/migrations/v0_to_v1.js",
   "shared/migrations/v1_to_v2.js",
@@ -518,24 +519,63 @@ function grantFocusPass(domain) {
   });
 }
 
-// What focus says about one URL: { blocked, reason, until, nextChange }. nextChange is
-// when the answer could differ, so a page that is already open knows when to ask again
-// (a schedule starting, a session or a pass ending) without polling the worker.
+// Pages recognised by what they do rather than by name (shared/focuspage.js), kept for
+// the rest of this stretch of focus. Session storage: it is gone when the browser closes.
+const FOCUS_SEEN_KEY = "focusSeen"; // session: [{ host, path, prefix, category, at }]
+
+function rememberFocusPage(url, verdict, since) {
+  return serialized(async () => {
+    const data = await sessionGet([FOCUS_SEEN_KEY]);
+    const kept = (data[FOCUS_SEEN_KEY] || []).filter((e) => e && e.at >= since).slice(-49);
+    kept.push(focusRememberEntry(url, verdict));
+    await sessionSet({ [FOCUS_SEEN_KEY]: kept });
+  });
+}
+
+// A named site, or a streaming site recognised as one, is closed as a whole and is called
+// by its name. A recognised feed is one part of a site, so only that part is mentioned.
+function focusReason(url, recognisedFeed) {
+  return recognisedFeed
+    ? "This feed is closed while you focus."
+    : `${domainFromUrl(url)} is closed while you focus.`;
+}
+
+// What focus says about one URL: { blocked, reason, until, nextChange, watch }.
+// nextChange is when the answer could differ, so a page that is already open knows when
+// to ask again (a schedule starting, a session or a pass ending) without polling the
+// worker. watch is what the page should look for in itself when no list names it.
 async function focusPolicyFor(url, stored) {
   const status = focusStatus(stored);
-  const policy = { blocked: false, active: status.active, until: status.until, nextChange: status.nextChange };
+  const policy = {
+    blocked: false, active: status.active, startedAt: status.startedAt,
+    until: status.until, nextChange: status.nextChange, watch: null,
+  };
   if (!status.active) return policy;
 
-  const match = focusMatch(url, stored.focus);
-  if (!match) return policy;
+  let match = focusMatch(url, stored.focus);
+  let recognisedFeed = false;
+  if (!match) {
+    const data = await sessionGet([FOCUS_SEEN_KEY]);
+    const seen = focusRemembered(data[FOCUS_SEEN_KEY], url, status.startedAt);
+    // Switching a category off (only possible between sessions) forgets what it caught.
+    if (seen && focusSettings(stored.focus).categories[seen.category]) {
+      match = seen;
+      recognisedFeed = seen.category === "feeds";
+    }
+  }
 
   const passUntil = await getFocusPass(domainFromUrl(url));
   if (passUntil) {
+    // Five minutes means five minutes: nothing is looked for while a pass runs.
     policy.nextChange = Math.min(passUntil, status.until);
     return policy;
   }
+  if (!match) {
+    policy.watch = focusWatchFor(url, stored.focus);
+    return policy;
+  }
   policy.blocked = true;
-  policy.reason = `${domainFromUrl(url)} is closed while you focus.`;
+  policy.reason = focusReason(url, recognisedFeed);
   return policy;
 }
 
@@ -590,6 +630,7 @@ const SENDER_RULES = {
   getTabPolicy: fromContentScript,
   tabVerdict: fromContentScript,
   redirect: fromContentScript,
+  focusDetected: fromContentScript,
   classifyImage: fromContentScript,
   nanoAdjudicate: fromContentScript,
   getBlockContext: fromRedirectPage,
@@ -692,6 +733,25 @@ const HANDLERS = {
     }
     const reason = String(msg.reason || "").slice(0, 200) || "This page was flagged.";
     await redirectTab(sender.tab.id, sender.tab.url, reason);
+    return { ok: true };
+  },
+
+  // The page recognised itself as streaming or as an endless feed (shared/focuspage.js).
+  // The signals are the page's word, so the decision is made again here from them, and
+  // only for a URL that focus was actually watching. Like every focus block, it is not a
+  // slip: no block log, no pause count.
+  async focusDetected(msg, sender) {
+    if (!sender.tab?.id || !sender.tab.url || sender.frameId) return { ok: false };
+    const url = sender.tab.url;
+    const focus = await focusPolicyFor(url, await storageGet(FOCUS_KEYS));
+    if (!focus.active || focus.blocked || !focus.watch) return { ok: false };
+    const verdict = focusPageVerdict(msg.signals, focus.watch);
+    if (!verdict) return { ok: false };
+    await rememberFocusPage(url, verdict, focus.startedAt || 0);
+    await stashBlocked(sender.tab.id, url, focusReason(url, verdict.category === "feeds"), "focus");
+    await recordDayEvent("focusBlocks");
+    chrome.tabs.update(sender.tab.id, { url: chrome.runtime.getURL("redirect/redirect.html") })
+      .catch(() => {});
     return { ok: true };
   },
 

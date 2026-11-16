@@ -35,6 +35,7 @@ const SHARED = [
   "shared/migrations/v1_to_v2.js",
   "shared/protection.js",
   "shared/focus.js",
+  "shared/focuspage.js",
   "shared/report.js",
   "shared/toolbar.js",
   "shared/storage.js",

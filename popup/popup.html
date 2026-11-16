@@ -59,6 +59,16 @@
           <span class="focus-strip-go">Open</span>
         </button>
 
+        <!-- A coffee, asked for once a week has passed and no report is waiting. -->
+        <div class="support-strip" id="supportStrip" style="display:none">
+          <button class="support-strip-main" id="supportOpen" type="button">
+            <span class="support-strip-heart" aria-hidden="true">♥</span>
+            <span class="focus-strip-text">CleanTab is free. Buy me a coffee?</span>
+            <span class="focus-strip-go">Ko-fi</span>
+          </button>
+          <button class="support-strip-x" id="supportLater" type="button" aria-label="Not now" title="Not now">×</button>
+        </div>
+
         <!-- Focus, one tap from the first screen. Shows the time left once it is running. -->
         <button class="focus-strip" id="focusStrip" type="button">
           <span class="focus-strip-dot" aria-hidden="true"></span>
@@ -71,6 +81,7 @@
           <div class="mascot mascot-hero" id="mascotRing" role="img" aria-label="CleanTab mascot"></div>
           <p class="mascot-say" id="mascotSay"></p>
         </div>
+        <div class="ring-col">
         <div class="ring-stage" id="ringCard">
           <svg class="ring-svg" viewBox="0 0 140 140" role="img" aria-label="Protected days out of the last 14">
             <defs>
@@ -96,8 +107,9 @@
             <span class="ring-lbl" id="ringSub">of last 14 days</span>
           </div>
         </div>
-        </div>
         <p class="ring-context" id="ringContext">Nothing browsed yet today.</p>
+        </div>
+        </div>
 
         <!-- Shown only when the data says so; wording is deliberately kind. -->
         <div class="soft-card slip" id="slipCard" style="display:none" role="status">
@@ -182,21 +194,21 @@
             <input type="checkbox" id="focusCatStreaming"/>
             <span class="toggle-copy">
               <span class="toggle-title">Streaming</span>
-              <span class="toggle-sub">Netflix, YouTube, Twitch, Prime Video, Disney+ and the like.</span>
+              <span class="toggle-sub">Netflix, Twitch, Prime Video, Disney+, and any site playing films, shows or live TV.</span>
             </span>
           </label>
           <label class="toggle-row sub">
             <input type="checkbox" id="focusKeepYouTube"/>
             <span class="toggle-copy">
               <span class="toggle-title">Keep YouTube open</span>
-              <span class="toggle-sub">For tutorials and music. Shorts still close with doom scrolling.</span>
+              <span class="toggle-sub">Normal videos stay open. Shorts still close with doom scrolling.</span>
             </span>
           </label>
           <label class="toggle-row">
             <input type="checkbox" id="focusCatFeeds"/>
             <span class="toggle-copy">
               <span class="toggle-title">Doom scrolling</span>
-              <span class="toggle-sub">TikTok, Instagram, X, Reddit, Facebook, YouTube Shorts.</span>
+              <span class="toggle-sub">TikTok, Instagram, X, Reddit, Shorts, and any endless feed.</span>
             </span>
           </label>
 
@@ -544,6 +556,7 @@
       </section>
 
       <p class="report-foot" id="reportFoot"></p>
+      <p class="report-foot">CleanTab is free and made by one person. <a id="reportSupport" href="#" target="_blank" rel="noopener noreferrer">Buy me a coffee</a></p>
     </div>
     <div class="flow-actions">
       <button class="btn btn-ghost" id="reportCopy">Copy summary</button>

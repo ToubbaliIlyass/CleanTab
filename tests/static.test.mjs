@@ -15,13 +15,13 @@ const BUNDLES = {
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/keywords.js",
     "shared/scoring.js", "shared/pageshape.js", "shared/detect.js", "shared/nano.js", "shared/allowance.js",
     "shared/review.js", "shared/schema.js", "shared/lock.js", "shared/friction.js",
-    "shared/protection.js", "shared/focus.js", "shared/toolbar.js",
+    "shared/protection.js", "shared/focus.js", "shared/focuspage.js", "shared/toolbar.js",
     "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js",
     "shared/storage.js", "background.js",
   ],
   "content script": ["shared/domains.js", "shared/keywords.js", "shared/thresholds.js",
                      "shared/scoring.js", "shared/pageshape.js", "shared/detect.js", "shared/dwell.js",
-                     "shared/nano.js", "content.js"],
+                     "shared/nano.js", "shared/focuspage.js", "content.js"],
   "popup": [
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/keywords.js", "shared/schema.js",
     "shared/lock.js", "shared/friction.js",
@@ -190,7 +190,7 @@ export default async function () {
     "shared/dates.js", "shared/domains.js", "shared/thresholds.js", "shared/keywords.js",
     "shared/scoring.js", "shared/pageshape.js", "shared/detect.js", "shared/dwell.js", "shared/nano.js", "shared/allowance.js",
     "shared/review.js", "shared/schema.js", "shared/lock.js", "shared/friction.js",
-    "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js", "shared/protection.js", "shared/focus.js",
+    "shared/migrations/v0_to_v1.js", "shared/migrations/v1_to_v2.js", "shared/protection.js", "shared/focus.js", "shared/focuspage.js",
     "shared/report.js", "shared/toolbar.js", "shared/storage.js",
   ];
   const ALL_SHARED = new Set(SHARED_FILES.flatMap(declarationsIn));

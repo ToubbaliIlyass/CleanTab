@@ -92,6 +92,171 @@ function maybeRecheckFocus() {
   refreshPolicy().then(enforceFocus).catch(() => {});
 }
 
+// ── Focus mode: pages no list names ───────────────────────────────────────────
+//
+// While focus is on and the worker has no rule for this URL, the page is watched for the
+// two things focus closes: a streaming player, and doom scrolling. What counts as either
+// is decided in shared/focuspage.js; this only measures. It runs once a second from the
+// navigation tick, only during focus, only in the top frame, and reads nothing but
+// sizes, durations and the page's own description of itself. Nothing leaves the device.
+
+const focusSeen = {
+  drm: false,           // a video on this page asked for a decryption key
+  shorts: new Map(),    // short upright videos played: source → when
+  path: "",             // endless-scroll counters belong to one address
+  scrolled: false,
+  lastHeight: 0,
+  growths: 0,
+  screens: 0,
+  meta: null,           // { url, ogType, ldTypes }
+  askedAt: 0,
+};
+
+// `encrypted` does not bubble, so it is caught on the way down.
+document.addEventListener("encrypted", () => { focusSeen.drm = true; }, true);
+window.addEventListener("scroll", () => { focusSeen.scrolled = true; }, { passive: true, capture: true });
+
+function visibleBox(el) {
+  const r = el.getBoundingClientRect();
+  const w = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
+  const h = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+  return w > 0 && h > 0 ? { w, h, area: w * h } : { w: 0, h: 0, area: 0 };
+}
+
+// A camera or a call is a video too, and never the kind focus is about.
+function isCallVideo(v) {
+  try { return typeof MediaStream !== "undefined" && v.srcObject instanceof MediaStream; } catch { return false; }
+}
+
+function pageMeta() {
+  if (focusSeen.meta && focusSeen.meta.url === location.href) return focusSeen.meta;
+  const ldTypes = [];
+  const collect = (node, depth) => {
+    if (!node || depth > 4 || ldTypes.length > 40) return;
+    if (Array.isArray(node)) { node.forEach((n) => collect(n, depth + 1)); return; }
+    if (typeof node !== "object") return;
+    [].concat(node["@type"] || []).forEach((t) => { if (typeof t === "string") ldTypes.push(t); });
+    collect(node["@graph"], depth + 1);
+  };
+  const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+  for (let i = 0; i < scripts.length && i < 6; i++) {
+    const text = scripts[i].textContent || "";
+    if (text.length > 100000) continue;
+    try { collect(JSON.parse(text), 0); } catch { /* not ours to fix */ }
+  }
+  focusSeen.meta = {
+    url: location.href,
+    ogType: document.querySelector('meta[property="og:type"]')?.content || "",
+    ldTypes,
+  };
+  return focusSeen.meta;
+}
+
+function gatherFocusSignals(watch) {
+  const now = Date.now();
+  const viewport = window.innerWidth * window.innerHeight || 1;
+  let player = null;
+  let playerArea = 0;
+
+  for (const v of document.querySelectorAll("video")) {
+    if (isCallVideo(v)) continue;
+    const playing = !v.paused && !v.ended && v.currentTime > 2;
+    if (!playing) continue;
+    const box = visibleBox(v);
+    const duration = v.duration;
+
+    // A short: upright, brief, and filling at least half the window's height.
+    if (watch.feeds && Number.isFinite(duration) && duration <= FOCUS_PAGE.shortSeconds &&
+        v.videoHeight >= v.videoWidth * 1.2 && box.h >= window.innerHeight * 0.5) {
+      const key = v.currentSrc || v.src || `#${duration}`;
+      if (!focusSeen.shorts.has(key)) focusSeen.shorts.set(key, now);
+    }
+
+    if (watch.streaming && box.area >= viewport * FOCUS_PAGE.playerCoverage && box.area > playerArea) {
+      playerArea = box.area;
+      player = {
+        kind: "video",
+        minutes: Number.isFinite(duration) ? duration / 60 : null,
+        live: duration === Infinity,
+        drm: focusSeen.drm || Boolean(v.mediaKeys),
+      };
+    }
+  }
+
+  // A player in a frame from another site cannot be seen into. Its size is all there is.
+  if (watch.streaming && !player) {
+    for (const f of document.querySelectorAll('iframe[allowfullscreen], iframe[allow*="fullscreen"]')) {
+      if (visibleBox(f).area >= viewport * FOCUS_PAGE.playerCoverage) {
+        player = { kind: "embed", minutes: null, live: false, drm: false };
+        break;
+      }
+    }
+  }
+
+  for (const [key, at] of focusSeen.shorts) {
+    if (now - at > FOCUS_PAGE.shortsWindowMs) focusSeen.shorts.delete(key);
+  }
+
+  // Endless scroll: the page got at least a window taller after being scrolled.
+  const feed = { growths: 0, screens: 0, posts: 0 };
+  const scroller = document.scrollingElement;
+  if (watch.feeds && scroller) {
+    if (focusSeen.path !== location.pathname) {
+      focusSeen.path = location.pathname;
+      focusSeen.lastHeight = 0;
+      focusSeen.growths = 0;
+      focusSeen.screens = 0;
+    }
+    const vh = window.innerHeight || 1;
+    const height = scroller.scrollHeight;
+    if (!focusSeen.lastHeight) {
+      focusSeen.lastHeight = height;
+    } else if (height >= focusSeen.lastHeight + vh * 0.8) {
+      if (focusSeen.scrolled) focusSeen.growths += 1;
+      focusSeen.lastHeight = height;
+      focusSeen.scrolled = false;
+    }
+    focusSeen.screens = Math.max(focusSeen.screens, scroller.scrollTop / vh);
+    feed.growths = focusSeen.growths;
+    feed.screens = Math.round(focusSeen.screens * 10) / 10;
+    if (feed.growths >= FOCUS_PAGE.feedGrowths && feed.screens >= FOCUS_PAGE.feedScreens) {
+      feed.posts = document.querySelectorAll('article, [role="article"], [role="feed"] > *').length;
+    }
+  }
+
+  const meta = player ? pageMeta() : { ogType: "", ldTypes: [] };
+  return {
+    title: document.title.slice(0, 300),
+    path: location.pathname.slice(0, 300),
+    ogType: meta.ogType,
+    ldTypes: meta.ldTypes,
+    player,
+    shorts: focusSeen.shorts.size,
+    feed,
+    search: /[?&](q|query|search|search_query|keyword|k|s)=/i.test(location.search) ||
+      /\/search(\/|$)/i.test(location.pathname),
+  };
+}
+
+function watchFocusPage() {
+  const focus = policy.focus;
+  if (!focus || !focus.active || focus.blocked || !focus.watch) return;
+  if (redirectTriggered || window.top !== window) return;
+  let signals;
+  try { signals = gatherFocusSignals(focus.watch); } catch { return; }
+  if (!focusPageVerdict(signals, focus.watch)) return;
+  if (Date.now() - focusSeen.askedAt < 5000) return; // the worker said no a moment ago
+  focusSeen.askedAt = Date.now();
+  try {
+    chrome.runtime.sendMessage({ action: "focusDetected", signals }, (res) => {
+      void chrome.runtime.lastError;
+      if (res && res.ok) redirectTriggered = true;
+    });
+  } catch {
+    // Extension reloaded under this page.
+  }
+}
+
 // Page shape helpers (isInsidePost, isYouTube, isHomeFeed, allowsTextScan) come from
 // shared/pageshape.js, loaded ahead of this file by the manifest.
 
@@ -358,6 +523,7 @@ const navTimer = setInterval(() => {
   handleNavigation();
   maybeRescan();
   maybeRecheckFocus();
+  watchFocusPage();
 }, 1000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && chrome.runtime?.id) { handleNavigation(); maybeRecheckFocus(); }

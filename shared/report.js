@@ -175,6 +175,22 @@ function reportDue(firstDayKey, todayKey, seenAt, now = Date.now()) {
   return !seenAt || now - seenAt >= REPORT_EVERY_MS;
 }
 
+// Asking for a coffee. Only in the popup, never on the pause screen: that screen meets
+// someone at a hard moment and must not ask them for anything. It waits a week, comes
+// after the first report rather than beside it (the caller checks), and any answer,
+// including "not now", puts it away for three months. It is a link and nothing else: the
+// extension itself contacts nobody.
+const SUPPORT_URL = "https://ko-fi.com/ilyasstoubbali";
+const SUPPORT_AFTER_DAYS = 7;
+const SUPPORT_EVERY_MS = 90 * 24 * 60 * 60 * 1000;
+
+function supportDue(firstDayKey, todayKey, seenAt, now = Date.now()) {
+  if (!firstDayKey || !todayKey) return false;
+  const days = Math.round((reportDateOf(todayKey) - reportDateOf(firstDayKey)) / (24 * 60 * 60 * 1000));
+  if (days < SUPPORT_AFTER_DAYS) return false;
+  return !seenAt || now - seenAt >= SUPPORT_EVERY_MS;
+}
+
 function reportFirstDay(history, today) {
   const keys = Object.keys(history || {});
   if (today && today.date) keys.push(today.date);
