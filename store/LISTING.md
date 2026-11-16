@@ -1,7 +1,7 @@
 # Chrome Web Store listing kit (CleanTab 1.0.0)
 
 Everything to paste into the Developer Dashboard, in the order the dashboard asks for it.
-Images are in this folder. This file replaces the text in `LISTING-SEO.md`.
+Images are in this folder. This file replaces the text in `docs/LISTING-SEO.md`.
 
 `dist/cleantab-1.0.0.zip` was rebuilt on 2026-11-16 from the working folder and contains the
 weekly report, the popup polish, the wider focus-mode detection and the coffee link. If the

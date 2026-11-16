@@ -1,5 +1,5 @@
 // Generates the toolbar icons: Assets/mascot/toolbar/<mood>-<16|32>.png and the contact
-// sheet toolbar-moods.png. Run after changing a face:  node tests/gen-toolbar.mjs
+// sheet docs/toolbar-moods.png. Run after changing a face:  node tests/gen-toolbar.mjs
 //
 // Every mood is the kit's icon-small mascot (the smooth rounded face, tab with orange dot,
 // orange offset shadow) with only the face changed. Art is rendered large and halved
@@ -106,6 +106,6 @@ await pg.evaluate(async ({ levels, r16, r32 }) => {
     c.fillStyle = "#000";
   });
 }, { levels, r16: ref(16), r32: ref(32) });
-await pg.locator("#c").screenshot({ path: path.join(ROOT, "toolbar-moods.png") });
+await pg.locator("#c").screenshot({ path: path.join(ROOT, "docs", "toolbar-moods.png") });
 await b.close();
-console.log("wrote", levels.length * 2, "icons and toolbar-moods.png");
+console.log("wrote", levels.length * 2, "icons and docs/toolbar-moods.png");

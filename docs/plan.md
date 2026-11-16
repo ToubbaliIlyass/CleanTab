@@ -341,7 +341,7 @@ Remove all the dead code and align README with reality.
 CleanTab/
 ├── manifest.json
 ├── README.md
-├── plan.md                           ← this file
+├── docs/plan.md                           ← this file
 ├── Assets/
 ├── background.js                     ← slimmed; delegates to shared/
 ├── content.js                        ← slimmed; word-boundary regex
