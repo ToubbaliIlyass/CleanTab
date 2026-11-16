@@ -52,6 +52,23 @@
           </div>
         </div>
 
+        <!-- The weekly report, when one is due (popup/report-view.js). -->
+        <button class="report-strip" id="reportStrip" type="button" style="display:none">
+          <span class="report-strip-star" aria-hidden="true">★</span>
+          <span class="focus-strip-text" id="reportStripText">Your week is ready</span>
+          <span class="focus-strip-go">Open</span>
+        </button>
+
+        <!-- A coffee, asked for once a week has passed and no report is waiting. -->
+        <div class="support-strip" id="supportStrip" style="display:none">
+          <button class="support-strip-main" id="supportOpen" type="button">
+            <span class="support-strip-heart" aria-hidden="true">♥</span>
+            <span class="focus-strip-text">CleanTab is free. Buy me a coffee?</span>
+            <span class="focus-strip-go">Ko-fi</span>
+          </button>
+          <button class="support-strip-x" id="supportLater" type="button" aria-label="Not now" title="Not now">×</button>
+        </div>
+
         <!-- Focus, one tap from the first screen. Shows the time left once it is running. -->
         <button class="focus-strip" id="focusStrip" type="button">
           <span class="focus-strip-dot" aria-hidden="true"></span>
@@ -64,6 +81,7 @@
           <div class="mascot mascot-hero" id="mascotRing" role="img" aria-label="CleanTab mascot"></div>
           <p class="mascot-say" id="mascotSay"></p>
         </div>
+        <div class="ring-col">
         <div class="ring-stage" id="ringCard">
           <svg class="ring-svg" viewBox="0 0 140 140" role="img" aria-label="Protected days out of the last 14">
             <defs>
@@ -89,8 +107,9 @@
             <span class="ring-lbl" id="ringSub">of last 14 days</span>
           </div>
         </div>
-        </div>
         <p class="ring-context" id="ringContext">Nothing browsed yet today.</p>
+        </div>
+        </div>
 
         <!-- Shown only when the data says so; wording is deliberately kind. -->
         <div class="soft-card slip" id="slipCard" style="display:none" role="status">
@@ -175,21 +194,21 @@
             <input type="checkbox" id="focusCatStreaming"/>
             <span class="toggle-copy">
               <span class="toggle-title">Streaming</span>
-              <span class="toggle-sub">Netflix, YouTube, Twitch, Prime Video, Disney+ and the like.</span>
+              <span class="toggle-sub">Netflix, Twitch, Prime Video, Disney+, and any site playing films, shows or live TV.</span>
             </span>
           </label>
           <label class="toggle-row sub">
             <input type="checkbox" id="focusKeepYouTube"/>
             <span class="toggle-copy">
               <span class="toggle-title">Keep YouTube open</span>
-              <span class="toggle-sub">For tutorials and music. Shorts still close with doom scrolling.</span>
+              <span class="toggle-sub">Normal videos stay open. Shorts still close with doom scrolling.</span>
             </span>
           </label>
           <label class="toggle-row">
             <input type="checkbox" id="focusCatFeeds"/>
             <span class="toggle-copy">
               <span class="toggle-title">Doom scrolling</span>
-              <span class="toggle-sub">TikTok, Instagram, X, Reddit, Facebook, YouTube Shorts.</span>
+              <span class="toggle-sub">TikTok, Instagram, X, Reddit, Shorts, and any endless feed.</span>
             </span>
           </label>
 
@@ -263,7 +282,10 @@
         <div class="panel-section" id="recapSection">
           <div class="recap-head"><p class="section-label">This week</p><div class="mascot mascot-recap" id="mascotRecap" aria-hidden="true"></div></div>
           <ul class="recap-list" id="recapList"></ul>
-          <button class="data-btn" id="recapCopy">Copy summary</button>
+          <div class="recap-btns">
+            <button class="data-btn" id="reportOpen">See the full week</button>
+            <button class="data-btn" id="recapCopy">Copy summary</button>
+          </div>
           <p class="guard-desc">Counts only, never sites. Share it with whoever you choose.</p>
         </div>
 
@@ -476,6 +498,73 @@
   </div><!-- /view-normal -->
 
   <!-- ══════════════════════════════════════ -->
+  <!--  VIEW: WEEKLY REPORT                   -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="view view-report" aria-labelledby="reportTitle">
+    <div class="report-scroll" id="reportScroll">
+
+      <header class="report-head">
+        <div>
+          <p class="section-label" id="reportRange"></p>
+          <h2 class="report-title" id="reportTitle">Your week</h2>
+        </div>
+        <div class="mascot mascot-report" id="mascotReport" aria-hidden="true"></div>
+      </header>
+      <p class="report-headline" id="reportHeadline"></p>
+
+      <!-- The week, a day at a time. -->
+      <section class="report-card">
+        <div class="report-hero">
+          <b class="report-big" id="reportProtected">0</b>
+          <span class="report-big-of">of 7 days<br/>protected</span>
+          <span class="report-delta" id="reportProtectedDelta"></span>
+        </div>
+        <ol class="report-days" id="reportDays" aria-label="Each day this week"></ol>
+        <p class="report-key"><span class="k protected"></span>Protected <span class="k slip"></span>Slip <span class="k notCounted"></span>Not counted</p>
+      </section>
+
+      <!-- What happened at the pause screen. -->
+      <section>
+        <p class="section-label">At the pause screen</p>
+        <div class="report-grid" id="reportGrid"></div>
+        <p class="report-note" id="reportWalked"></p>
+      </section>
+
+      <section id="reportBlocksSection">
+        <p class="section-label">Blocked, day by day</p>
+        <div class="report-bars" id="reportBars" role="img"></div>
+      </section>
+
+      <section id="reportFocusSection">
+        <p class="section-label">Focus</p>
+        <div class="report-focus">
+          <b class="report-mid" id="reportFocusTotal"></b>
+          <span class="report-delta" id="reportFocusDelta"></span>
+        </div>
+        <div class="report-bars focus" id="reportFocusBars" role="img"></div>
+      </section>
+
+      <section id="reportPatternsSection">
+        <p class="section-label">Patterns</p>
+        <ul class="report-patterns" id="reportPatterns"></ul>
+      </section>
+
+      <section id="reportFeelingsSection">
+        <p class="section-label">What was going on</p>
+        <div class="trigger-list" id="reportFeelings"></div>
+        <p class="report-note" id="reportPlan"></p>
+      </section>
+
+      <p class="report-foot" id="reportFoot"></p>
+      <p class="report-foot">CleanTab is free and made by one person. <a id="reportSupport" href="#" target="_blank" rel="noopener noreferrer">Buy me a coffee</a></p>
+    </div>
+    <div class="flow-actions">
+      <button class="btn btn-ghost" id="reportCopy">Copy summary</button>
+      <button class="btn btn-solid" id="reportDone">Done</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
   <!--  VIEW: CONFIRM                         -->
   <!-- ══════════════════════════════════════ -->
   <div class="view view-confirm">
@@ -663,8 +752,10 @@
 <script src="../shared/friction.js"></script>
 <script src="../shared/protection.js"></script>
 <script src="../shared/focus.js"></script>
+<script src="../shared/report.js"></script>
 <script src="../shared/storage.js"></script>
 <script src="popup.js"></script>
 <script src="focus-tab.js"></script>
+<script src="report-view.js"></script>
 </body>
 </html>

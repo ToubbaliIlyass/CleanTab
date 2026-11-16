@@ -12,7 +12,7 @@ export default async function () {
   // ── What closes ────────────────────────────────────────────────────────────
   t("streaming and feed sites match by default", () => {
     eq(run(`focusMatch("https://www.netflix.com/browse", null).category`), "streaming");
-    eq(run(`focusMatch("https://www.youtube.com/watch?v=1", null).category`), "streaming");
+    eq(run(`focusMatch("https://www.twitch.tv/somebody", null).category`), "streaming");
     eq(run(`focusMatch("https://old.reddit.com/r/all", null).category`), "feeds");
     eq(run(`focusMatch("https://x.com/home", null).category`), "feeds");
   });
@@ -42,6 +42,19 @@ export default async function () {
     eq(run(`focusMatch("https://www.netflix.com/", __s)`), null);
     eq(run(`focusMatch("https://www.tiktok.com/", __s).category`), "feeds");
   });
+  t("by default a normal YouTube video stays open and Shorts close", () => {
+    eq(run(`focusMatch("https://www.youtube.com/watch?v=1", null)`), null);
+    eq(run(`focusMatch("https://www.youtube.com/", null)`), null);
+    eq(run(`focusMatch("https://www.youtube.com/shorts/abc", null).category`), "feeds");
+    eq(run(`focusMatch("https://tv.youtube.com/watch/abc", null).category`), "streaming");
+    ok(run(`focusSettings(null).keepYouTube`));
+    ok(run(`focusSettings({ sites: [] }).keepYouTube`));
+  });
+  t("unticking 'keep YouTube open' closes YouTube altogether", () => {
+    set("__s", { keepYouTube: false });
+    eq(run(`focusMatch("https://www.youtube.com/watch?v=1", __s).category`), "streaming");
+    eq(run(`focusMatch("https://music.youtube.com/", __s)`), null);
+  });
   t("keeping YouTube leaves videos open and Shorts closed", () => {
     set("__s", { keepYouTube: true });
     eq(run(`focusMatch("https://www.youtube.com/watch?v=1", __s)`), null);
@@ -64,6 +77,100 @@ export default async function () {
     eq(s.categories, { streaming: true, feeds: true });
     eq(s.sites, ["example.com"]);
     eq(s.schedule.enabled, false);
+  });
+
+  // ── Sites no list names (shared/focuspage.js) ─────────────────────────────
+  const both = { streaming: true, feeds: true };
+  const verdict = (signals, watch = both) => {
+    set("__sig", signals); set("__w", watch);
+    return run(`focusPageVerdict(__sig, __w)`);
+  };
+  const video = (over = {}) => ({ kind: "video", minutes: 45, live: false, drm: false, ...over });
+
+  t("a copy-protected film on an unknown service is streaming", () => {
+    eq(verdict({ title: "Home", player: video({ drm: true, minutes: 96 }) }).category, "streaming");
+    eq(verdict({ title: "Live", player: video({ drm: true, minutes: null, live: true }) }).category, "streaming");
+  });
+  t("a page that declares itself a film or an episode is streaming", () => {
+    eq(verdict({ ogType: "video.episode", player: video() }).category, "streaming");
+    eq(verdict({ ldTypes: ["WebPage", "TVEpisode"], player: video() }).category, "streaming");
+    eq(verdict({ ldTypes: ["Movie"], player: video({ minutes: 110 }) }).why, "declared");
+  });
+  t("'watch … online' wording with a long or embedded player is streaming", () => {
+    eq(verdict({ title: "Watch Some Show Season 2 Episode 5 Online Free", player: video() }).category, "streaming");
+    eq(verdict({ title: "Player", path: "/watch/some-show-s02e05", player: video() }).category, "streaming");
+    eq(verdict({ title: "Some Anime Episode 12 English Sub", player: { kind: "embed" } }).category, "streaming");
+    eq(verdict({ title: "Some Film (2019) Full Movie HD", player: { kind: "embed" } }).category, "streaming");
+  });
+  t("an ordinary video is not streaming, however long", () => {
+    eq(verdict({ title: "Lecture 4: Time series analysis", player: video({ minutes: 80 }) }), null);
+    eq(verdict({ title: "Quarterly all-hands recording", ogType: "video.other", player: video({ minutes: 55 }) }), null);
+    eq(verdict({ title: "Episode 5: Building the API", player: video({ minutes: 30 }) }), null);
+    eq(verdict({ title: "Product launch", player: video({ minutes: null, live: true }) }), null);
+    eq(verdict({ title: "Docs", player: { kind: "embed" } }), null);
+  });
+  t("a trailer on a film database is not streaming", () => {
+    eq(verdict({ ogType: "video.movie", ldTypes: ["Movie"], title: "Some Film (2019)", player: video({ minutes: 2.5 }) }), null);
+    eq(verdict({ title: "Watch the trailer online", player: video({ minutes: 2.5 }) }), null);
+  });
+  t("no player, no verdict", () => {
+    eq(verdict({ ogType: "video.movie", title: "Watch movies online free", player: null }), null);
+  });
+  t("three short upright videos in a row is doom scrolling; one or two is not", () => {
+    eq(verdict({ shorts: 3 }).category, "feeds");
+    eq(verdict({ shorts: 3 }).why, "shorts");
+    eq(verdict({ shorts: 2 }), null);
+    eq(verdict({ shorts: 1, player: video({ minutes: 1 }) }), null);
+  });
+  t("a page of posts that keeps loading more is doom scrolling", () => {
+    eq(verdict({ feed: { growths: 4, screens: 9, posts: 14 } }).why, "endless");
+    eq(verdict({ feed: { growths: 3, screens: 9, posts: 14 } }), null);
+    eq(verdict({ feed: { growths: 6, screens: 5, posts: 14 } }), null);
+  });
+  t("a long page that is not posts, and search results, are not doom scrolling", () => {
+    eq(verdict({ feed: { growths: 6, screens: 20, posts: 0 } }), null);
+    eq(verdict({ feed: { growths: 6, screens: 20, posts: 30 }, search: true }), null);
+  });
+  t("only what is being watched for is decided", () => {
+    eq(verdict({ shorts: 5 }, { streaming: true, feeds: false }), null);
+    eq(verdict({ player: video({ drm: true }) }, { streaming: false, feeds: true }), null);
+    eq(verdict({ shorts: 5 }, null), null);
+    eq(verdict(null), null);
+  });
+
+  t("unknown sites are watched for both; work sites and tools are left alone", () => {
+    eq(run(`focusWatchFor("https://example.org/x", null)`), { streaming: true, feeds: true });
+    eq(run(`focusWatchFor("https://www.udemy.com/course/x/learn", null)`), null);
+    eq(run(`focusWatchFor("https://meet.google.com/abc", null)`), null);
+    eq(run(`focusWatchFor("https://music.youtube.com/", null)`), null);
+    eq(run(`focusWatchFor("chrome://extensions", null)`), null);
+  });
+  t("YouTube kept open is watched for doom scrolling only", () => {
+    eq(run(`focusWatchFor("https://www.youtube.com/watch?v=1", null)`), { streaming: false, feeds: true });
+    set("__s", { categories: { feeds: false } });
+    eq(run(`focusWatchFor("https://www.youtube.com/watch?v=1", __s)`), null);
+    eq(run(`focusWatchFor("https://example.org/", __s)`), { streaming: true, feeds: false });
+  });
+  t("a recognised streaming site is remembered as a whole", () => {
+    set("__e", [run(`focusRememberEntry("https://www.stream.example/watch/1", { category: "streaming", why: "protected" }, 1000)`)]);
+    eq(run(`focusRemembered(__e, "https://stream.example/browse", 500).category`), "streaming");
+    eq(run(`focusRemembered(__e, "https://other.example/watch/1", 500)`), null);
+  });
+  t("a recognised feed is remembered only where the scrolling happened", () => {
+    set("__e", [
+      run(`focusRememberEntry("https://clips.example/reels/abc", { category: "feeds", why: "shorts" }, 1000)`),
+      run(`focusRememberEntry("https://www.youtube.com/", { category: "feeds", why: "endless" }, 1000)`),
+    ]);
+    eq(run(`focusRemembered(__e, "https://clips.example/reels/xyz", 500).category`), "feeds");
+    eq(run(`focusRemembered(__e, "https://clips.example/reelsville", 500)`), null);
+    eq(run(`focusRemembered(__e, "https://clips.example/messages", 500)`), null);
+    eq(run(`focusRemembered(__e, "https://www.youtube.com/", 500).category`), "feeds");
+    eq(run(`focusRemembered(__e, "https://www.youtube.com/watch?v=1", 500)`), null);
+  });
+  t("what was recognised in an earlier session is forgotten", () => {
+    set("__e", [run(`focusRememberEntry("https://stream.example/", { category: "streaming" }, 1000)`)]);
+    eq(run(`focusRemembered(__e, "https://stream.example/", 2000)`), null);
+    eq(run(`focusRemembered(null, "https://stream.example/", 0)`), null);
   });
 
   // ── When ──────────────────────────────────────────────────────────────────

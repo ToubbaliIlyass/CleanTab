@@ -19,20 +19,26 @@
 
 // An entry is a domain ("netflix.com", subdomains included) or a domain plus a path
 // prefix ("youtube.com/shorts").
+//
+// These lists are the fast path: a named site closes before it has loaded. They are not
+// the whole definition. Anything they miss is recognised by what the page does
+// (shared/focuspage.js), so a streaming service nobody listed still closes.
 const FOCUS_CATEGORIES = {
   streaming: {
     label: "Streaming",
-    blurb: "Netflix, YouTube, Twitch, Prime Video, Disney+ and the like.",
+    blurb: "Netflix, Twitch, Prime Video, Disney+, and any site that plays films, shows or live TV.",
     sites: [
-      "netflix.com", "youtube.com", "twitch.tv", "primevideo.com", "amazon.com/gp/video",
-      "disneyplus.com", "hulu.com", "max.com", "hbomax.com", "crunchyroll.com",
-      "tv.apple.com", "peacocktv.com", "paramountplus.com", "dailymotion.com", "kick.com",
-      "shahid.mbc.net", "bilibili.com", "pluto.tv", "tubitv.com",
+      "netflix.com", "youtube.com", "tv.youtube.com", "twitch.tv", "primevideo.com",
+      "amazon.com/gp/video", "disneyplus.com", "hulu.com", "max.com", "hbomax.com",
+      "crunchyroll.com", "tv.apple.com", "peacocktv.com", "paramountplus.com",
+      "dailymotion.com", "kick.com", "shahid.mbc.net", "bilibili.com", "pluto.tv",
+      "tubitv.com", "discoveryplus.com", "viki.com", "mubi.com", "plex.tv", "rumble.com",
+      "dazn.com", "fubo.tv", "sling.com", "iq.com", "trovo.live",
     ],
   },
   feeds: {
     label: "Doom scrolling",
-    blurb: "TikTok, Instagram, X, Reddit, Facebook, and short-video feeds.",
+    blurb: "TikTok, Instagram, X, Reddit, Shorts, and any endless feed.",
     sites: [
       "tiktok.com", "instagram.com", "facebook.com", "x.com", "twitter.com", "reddit.com",
       "threads.net", "threads.com", "snapchat.com", "pinterest.com", "tumblr.com",
@@ -45,6 +51,16 @@ const FOCUS_CATEGORIES = {
 // Parts of a listed site that are tools rather than entertainment.
 const FOCUS_EXCEPTIONS = ["music.youtube.com", "studio.youtube.com", "business.facebook.com"];
 
+// Sites where a long video, even a copy-protected one, is the work itself: courses and
+// meetings. They are never guessed at. Adding one to "Also close" still closes it.
+const FOCUS_WORK_SITES = [
+  "udemy.com", "coursera.org", "edx.org", "khanacademy.org", "pluralsight.com",
+  "linkedin.com", "skillshare.com", "frontendmasters.com", "egghead.io", "laracasts.com",
+  "codecademy.com", "datacamp.com", "udacity.com", "brilliant.org", "domestika.org",
+  "oreilly.com", "zoom.us", "meet.google.com", "teams.microsoft.com", "teams.live.com",
+  "webex.com", "whereby.com", "loom.com", "drive.google.com", "docs.google.com",
+];
+
 const FOCUS_DURATIONS = [25, 50, 90]; // minutes
 const FOCUS_MAX_MINUTES = 8 * 60;
 const FOCUS_PASS_MS = 5 * 60 * 1000;
@@ -52,9 +68,10 @@ const FOCUS_END_WAIT_S = 30;
 
 const FOCUS_DEFAULTS = {
   categories: { streaming: true, feeds: true },
-  // "I watch tutorials": leaves YouTube open during focus. Shorts stay blocked while
-  // doom scrolling is on, because nobody learns from Shorts.
-  keepYouTube: false,
+  // Normal YouTube videos stay open during focus: most of what people watch there while
+  // working is a tutorial or music. Shorts stay closed while doom scrolling is on, and
+  // unticking this closes YouTube altogether.
+  keepYouTube: true,
   sites: [], // the user's own additions, bare domains
   schedule: { enabled: false, days: [1, 2, 3, 4, 5], startHour: 9, endHour: 17 },
 };
@@ -65,7 +82,7 @@ function focusSettings(stored) {
   const s = stored || {};
   return {
     categories: { ...FOCUS_DEFAULTS.categories, ...(s.categories || {}) },
-    keepYouTube: Boolean(s.keepYouTube),
+    keepYouTube: s.keepYouTube === undefined ? FOCUS_DEFAULTS.keepYouTube : Boolean(s.keepYouTube),
     sites: Array.isArray(s.sites) ? s.sites.map(normalizeDomain).filter(Boolean) : [],
     schedule: { ...FOCUS_DEFAULTS.schedule, ...(s.schedule || {}) },
   };
@@ -113,6 +130,69 @@ function focusMatch(url, stored) {
     }
   }
   return null;
+}
+
+// ── Sites no list names ───────────────────────────────────────────────────────
+
+const hostIn = (host, domains) => domains.some((d) => host === d || host.endsWith(`.${d}`));
+
+// Which of the two kinds of page the content script should look for at this URL
+// (shared/focuspage.js). Returns { streaming, feeds }, or null when there is nothing to
+// look for.
+function focusWatchFor(url, stored) {
+  let host;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    host = normalizeDomain(u.hostname);
+  } catch {
+    return null;
+  }
+  if (hostIn(host, FOCUS_EXCEPTIONS) || hostIn(host, FOCUS_WORK_SITES)) return null;
+  const settings = focusSettings(stored);
+  // A streaming site that is on the list and still open is open because the person said
+  // so (YouTube). It is not guessed at a second time.
+  const listedStreaming = FOCUS_CATEGORIES.streaming.sites
+    .some((entry) => hostIn(host, [entry.split("/")[0]]));
+  const watch = {
+    streaming: Boolean(settings.categories.streaming) && !listedStreaming,
+    feeds: Boolean(settings.categories.feeds),
+  };
+  return watch.streaming || watch.feeds ? watch : null;
+}
+
+// What to remember once a page has been recognised, so that going back to it does not
+// reopen it until it is recognised again. A streaming site closes as a whole. A feed
+// closes only where the scrolling happened: the rest of the site stays open.
+//   { host, path, prefix, category, at }
+function focusRememberEntry(url, verdict, now = Date.now()) {
+  const u = new URL(url);
+  const entry = { host: normalizeDomain(u.hostname), path: "", prefix: true, category: verdict.category, at: now };
+  if (verdict.category !== "feeds") return entry;
+  const parts = u.pathname.split("/").filter(Boolean);
+  // Short videos change address with every clip (/shorts/a, /shorts/b): remember the
+  // section. An endless page is one address: remember exactly that.
+  if (verdict.why === "shorts" && parts.length >= 2) return { ...entry, path: `/${parts[0]}` };
+  return { ...entry, path: u.pathname || "/", prefix: false };
+}
+
+// The remembered entry that covers this URL, or null. Entries from before this stretch of
+// focus started (`since`) no longer count.
+function focusRemembered(entries, url, since = 0) {
+  let host, pathname;
+  try {
+    const u = new URL(url);
+    host = normalizeDomain(u.hostname);
+    pathname = u.pathname || "/";
+  } catch {
+    return null;
+  }
+  return (Array.isArray(entries) ? entries : []).find((e) => {
+    if (!e || e.at < since || e.host !== host) return false;
+    if (!e.path) return true;
+    if (!e.prefix) return pathname === e.path;
+    return pathname === e.path || pathname.startsWith(`${e.path}/`);
+  }) || null;
 }
 
 // ── When ──────────────────────────────────────────────────────────────────────

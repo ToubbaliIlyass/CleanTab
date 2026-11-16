@@ -94,6 +94,10 @@ function getDefaults(dateStr) {
     // Quick-pause timestamps (rate limit), and if-then plans keyed by reflection chip.
     pauseEvents: [],
     ifThenPlans: {},
+    // When the weekly report was last dismissed (shared/report.js).
+    reportSeenAt: null,
+    // When the "buy me a coffee" line was last answered (shared/report.js, supportDue).
+    supportSeenAt: null,
     // For the welcome-back card; set whenever the popup opens.
     lastPopupOpen: null,
 

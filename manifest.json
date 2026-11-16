@@ -34,6 +34,7 @@
         "shared/detect.js",
         "shared/dwell.js",
         "shared/nano.js",
+        "shared/focuspage.js",
         "content.js"
       ],
       "run_at": "document_start"

@@ -275,6 +275,19 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 
 ---
 
+## 15 — Weekly report
+
+| # | Test | Expected | ✓ |
+|---|------|----------|---|
+| 15.1 | Fresh install | No report row on the Now tab | |
+| 15.2 | After 7 days of use (or with a week of seeded history) | "Your first week is ready" on the Now tab; it opens the report | |
+| 15.3 | Read the report top to bottom | Numbers match the Progress heatmap and the Now tab; nothing is cut off; scrolls smoothly | |
+| 15.4 | Press Done | Row disappears; it comes back seven days later as "Your week is ready" | |
+| 15.5 | Progress → See the full week | Opens the same report at any time | |
+| 15.6 | Copy summary, paste somewhere | Counts only, no site names | |
+
+---
+
 ## 14 — Friction
 
 | # | Test | Expected | ✓ |
@@ -299,7 +312,12 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 13.1 | Focus tab → 25 min, with reddit.com already open in another tab | That tab becomes the "Focus." page within a second; toolbar badge shows `25m` | |
 | 13.2 | Open netflix.com, youtube.com, tiktok.com | Each shows "Focus." with the time left; nothing appears in Sites → Recently paused; "Pauses today" does not move | |
 | 13.3 | Open music.youtube.com and any ordinary site | Both load | |
-| 13.4 | Tick "Keep YouTube open" before starting; open a video, then a Short | Video loads; clicking into Shorts closes it | |
+| 13.4 | With "Keep YouTube open" ticked (the default), open a video, then a Short | Video loads; clicking into Shorts closes it. Unticked before starting: every YouTube page closes | |
+| 13.4a | During focus, play a film or episode on a streaming service that is NOT on the list (any copy-protected one) | Closes within a few seconds of playing, named by its domain; other pages of that site now close at once | |
+| 13.4b | During focus, play a long lecture or a meeting recording on an ordinary site, and a course video on Udemy or Coursera | All stay open | |
+| 13.4c | During focus, scroll an endless feed that is not on the list (a news or blog home page that loads more) for about ten screens | Closes as "This feed is closed while you focus."; a single article on the same site still opens | |
+| 13.4d | During focus, scroll the YouTube home page for about ten screens | The home page closes; a normal video still opens | |
+| 13.4e | During focus, scroll ten screens of search results, and a long documentation page | Both stay open | |
 | 13.5 | "I need this site" → "Open it for 5 minutes" | Site opens; after 5 minutes it closes again; the fourth use on one site in a day is refused | |
 | 13.6 | Start, then press Cancel within a minute | Ends at once. After a minute the button reads "End early" and takes a 30 s breather | |
 | 13.7 | During focus, try to untick a category or remove a site | Disabled, with the note explaining why | |
@@ -329,6 +347,7 @@ Set a policy locally to test: on macOS `defaults write com.google.Chrome 3rdpart
 | 12 — Managed policy | / 9 | | |
 | 13 — Focus mode | / 11 | | |
 | 14 — Friction | / 10 | | |
+| 15 — Weekly report | / 6 | | |
 
 **129 tests.** A clean run on 1–9 plus a decision on 10 is enough to submit; 11 and 12 gate the hardening claims on the /deploy page.
 
