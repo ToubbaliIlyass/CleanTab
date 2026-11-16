@@ -2,7 +2,7 @@
 
 > Superseded for 1.0.0 by `store/LISTING.md`, which has the current paste-ready text and the images. The launch reviews and links plan at the end of this file still applies.
 
-Text only. No code or behaviour change. Facts below come from README.md, LANDING.md, the code and the live privacy page (https://cleantab.acture.co/privacy). Limits checked against developer.chrome.com (screenshots 1280x800, max 5; small promo tile 440x280; marquee 1400x560; detailed description has no stated limit; keyword-spam policy applies). Title <=75 and summary <=132 are the limits given for this task.
+Text only. No code or behaviour change. Facts below come from README.md, docs/LANDING.md, the code and the live privacy page (https://cleantab.acture.co/privacy). Limits checked against developer.chrome.com (screenshots 1280x800, max 5; small promo tile 440x280; marquee 1400x560; detailed description has no stated limit; keyword-spam policy applies). Title <=75 and summary <=132 are the limits given for this task.
 
 ## Title (store name = manifest `name`) — 66 chars
 `CleanTab: NSFW & Porn Blocker, On-Device, With Accountability Lock`
